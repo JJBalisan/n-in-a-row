@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tictactoe"
+version = "1.0.0"
+description = "Generalised n-in-a-row: engine, search, CLI, GUI and an RL environment"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+rl = ["numpy>=1.20"]
+
+[project.scripts]
+tictactoe = "tictactoe.cli:main"
+tictactoe-gui = "tictactoe.gui:main"
+
+[tool.setuptools]
+packages = ["tictactoe"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "UP", "B", "SIM", "C4", "RET", "PIE", "RUF", "I"]
+ignore = [
+    "RET504",   # a named return value is often clearer than inlining it
+    "SIM108",   # ternaries are not always more readable
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]        # sys.path is set up before the package imports
+"examples/*" = ["E402"]
