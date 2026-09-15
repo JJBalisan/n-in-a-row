@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
 *.npz
+!examples/policy.npz
+!examples/solver_policy.npz
 *.jsonl
 .DS_Store
