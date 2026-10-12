@@ -54,15 +54,18 @@ Implement one method:
 ```python
 from tictactoe import Agent
 
+
 class MyNet(Agent):
     name = "mynet"
+
     def select(self, board) -> int:
-        obs = encode(board)                 # (3, rows, cols) float32
-        logits = self.net(obs)              # your forward pass
+        obs = encode(board)  # (3, rows, cols) float32
+        logits = self.net(obs)  # your forward pass
         logits[~np.asarray(board.legal_mask())] = -np.inf
         return int(logits.argmax())
 
-def agent():                                # the factory the CLI imports
+
+def agent():  # the factory the CLI imports
     return MyNet()
 ```
 
@@ -82,10 +85,14 @@ zero-argument factory returning either.
 from tictactoe.env import TicTacToeEnv
 from tictactoe.agents import load_agent
 
-env = TicTacToeEnv(rows=5, cols=5, k=4,
-                   opponent=load_agent("noisy:0.3:perfect"),
-                   illegal_move="lose")     # or "raise"
-obs = env.reset()                           # (3, 5, 5) float32
+env = TicTacToeEnv(
+    rows=5,
+    cols=5,
+    k=4,
+    opponent=load_agent("noisy:0.3:perfect"),
+    illegal_move="lose",  # or "raise"
+)
+obs = env.reset()  # (3, 5, 5) float32
 obs, reward, done, info = env.step(action)  # reward is the mover's: +1 / 0 / -1
 ```
 

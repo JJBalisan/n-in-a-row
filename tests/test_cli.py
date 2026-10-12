@@ -32,8 +32,11 @@ def run_cli(argv):
         raises SystemExit, is reported through its exit code.
     """
     out, err = io.StringIO(), io.StringIO()
-    with mock.patch.object(cli, "_color", return_value=False), \
-            contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+    with (
+        mock.patch.object(cli, "_color", return_value=False),
+        contextlib.redirect_stdout(out),
+        contextlib.redirect_stderr(err),
+    ):
         try:
             code = cli.main(argv)
         except SystemExit as exc:
@@ -57,7 +60,7 @@ def parse_solve(stdout):
     best_line = lines[head_i + 1].split()
     assert best_line[0] == "best", lines[head_i + 1]
     table = {}
-    for ln in lines[head_i + 2:]:
+    for ln in lines[head_i + 2 :]:
         if ln.strip():
             label, result = ln.strip().split(None, 1)
             table[label] = result
@@ -120,8 +123,8 @@ class TestShape(unittest.TestCase):
         cases = [
             ([], (3, 3, None)),
             (["--size", "5"], (5, 5, None)),
-            (["--rows", "2"], (2, 2, None)),            # cols follows rows
-            (["--cols", "6"], (3, 6, None)),            # rows falls back to size
+            (["--rows", "2"], (2, 2, None)),  # cols follows rows
+            (["--cols", "6"], (3, 6, None)),  # rows falls back to size
             (["--size", "5", "--cols", "6"], (5, 6, None)),
             (["--size", "5", "--rows", "2"], (2, 2, None)),
             (["--rows", "2", "--cols", "7"], (2, 7, None)),
@@ -138,18 +141,37 @@ class TestShape(unittest.TestCase):
     def test_match_shape_reaches_the_records(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "games.jsonl")
-            code, _, _ = run_cli(["match", "--a", "random", "--b", "random",
-                                  "--games", "2", "--seed", "1",
-                                  "--size", "9", "--rows", "2", "--cols", "5",
-                                  "-k", "3", "--out", out])
+            code, _, _ = run_cli(
+                [
+                    "match",
+                    "--a",
+                    "random",
+                    "--b",
+                    "random",
+                    "--games",
+                    "2",
+                    "--seed",
+                    "1",
+                    "--size",
+                    "9",
+                    "--rows",
+                    "2",
+                    "--cols",
+                    "5",
+                    "-k",
+                    "3",
+                    "--out",
+                    out,
+                ]
+            )
             self.assertEqual(code, 0)
             for rec in read_jsonl(out):
-                self.assertEqual((rec["rows"], rec["cols"], rec["k"]),
-                                 (2, 5, 3))
+                self.assertEqual(
+                    (rec["rows"], rec["cols"], rec["k"]), (2, 5, 3)
+                )
 
 
 class TestSolve(unittest.TestCase):
-
     def test_prints_board_headline_and_every_legal_reply(self):
         code, stdout, stderr = run_cli(["solve", "a1", "b2"])
         self.assertEqual(code, 0)
@@ -159,15 +181,16 @@ class TestSolve(unittest.TestCase):
         side, outcome, best, table = parse_solve(stdout)
         self.assertEqual(side, "X")
         self.assertEqual(outcome, "draw")
-        self.assertEqual(sorted(table), sorted(
-            ["b1", "c1", "a2", "c2", "a3", "b3", "c3"]))
+        self.assertEqual(
+            sorted(table), sorted(["b1", "c1", "a2", "c2", "a3", "b3", "c3"])
+        )
         self.assertTrue(all(v == "draw" for v in table.values()), table)
         self.assertIn(best, table)
 
     def test_headline_agrees_with_its_table(self):
         """The headline outcome is the table's row for the best move."""
         positions = [
-            ["a1", "b2", "c3", "c1"],     # the audit's reproduction
+            ["a1", "b2", "c3", "c1"],  # the audit's reproduction
             ["a1", "b1", "b2"],
             ["b2", "a1", "c3"],
             ["a1", "a2", "b1", "b2"],
@@ -189,8 +212,9 @@ class TestSolve(unittest.TestCase):
         self.assertEqual(table["a3"], "win in 2")
 
     def test_rectangle_and_k(self):
-        code, stdout, _ = run_cli(["solve", "--rows", "2", "--cols", "4",
-                                   "-k", "2", "a1"])
+        code, stdout, _ = run_cli(
+            ["solve", "--rows", "2", "--cols", "4", "-k", "2", "a1"]
+        )
         self.assertEqual(code, 0)
         side, outcome, _, table = parse_solve(stdout)
         self.assertEqual(side, "O")
@@ -227,7 +251,7 @@ class TestBadInput(unittest.TestCase):
             ["nonsense"],
             ["solve", "--size", "three"],
             ["play", "--side", "Z"],
-            ["match", "--b", "random"],               # --a is required
+            ["match", "--b", "random"],  # --a is required
             ["match", "--a", "random", "--b", "random", "--games", "x"],
         ):
             with self.subTest(argv=argv):
@@ -247,20 +271,31 @@ class TestBadInput(unittest.TestCase):
     @unittest.expectedFailure
     def test_unknown_agent_spec_exits_2(self):
         """KNOWN-FAIL: audit P2 'CLI error handling for bad agent specs'."""
-        self._assert_clean_exit_2(["match", "--a", "nonsense", "--b", "random",
-                                   "--games", "1"])
+        self._assert_clean_exit_2(
+            ["match", "--a", "nonsense", "--b", "random", "--games", "1"]
+        )
 
     @unittest.expectedFailure
     def test_missing_agent_module_exits_2(self):
         """KNOWN-FAIL: audit P2 'CLI error handling for bad agent specs'."""
-        self._assert_clean_exit_2(["match", "--a", "no_such_module_xyz:agent",
-                                   "--b", "random", "--games", "1"])
+        self._assert_clean_exit_2(
+            [
+                "match",
+                "--a",
+                "no_such_module_xyz:agent",
+                "--b",
+                "random",
+                "--games",
+                "1",
+            ]
+        )
 
     @unittest.expectedFailure
     def test_malformed_numeric_tail_exits_2(self):
         """KNOWN-FAIL: audit P2 '... and malformed numeric tails'."""
-        self._assert_clean_exit_2(["match", "--a", "negamax:x", "--b", "random",
-                                   "--games", "1"])
+        self._assert_clean_exit_2(
+            ["match", "--a", "negamax:x", "--b", "random", "--games", "1"]
+        )
 
     @unittest.expectedFailure
     def test_impossible_k_exits_2(self):
@@ -273,13 +308,24 @@ class TestBadInput(unittest.TestCase):
 
 
 class TestMatch(unittest.TestCase):
-
     def test_summary_and_recorded_games(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "games.jsonl")
             code, stdout, stderr = run_cli(
-                ["match", "--a", "greedy", "--b", "random", "--games", "6",
-                 "--seed", "7", "--out", out])
+                [
+                    "match",
+                    "--a",
+                    "greedy",
+                    "--b",
+                    "random",
+                    "--games",
+                    "6",
+                    "--seed",
+                    "7",
+                    "--out",
+                    out,
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(stderr, "")
             self.assertIn("greedy vs random over 6 games", stdout)
@@ -296,7 +342,7 @@ class TestMatch(unittest.TestCase):
                 board = replay_record(rec)
                 self.assertTrue(board.is_terminal)
                 self.assertEqual(board.winner, rec["winner"])
-                a_side = X if i % 2 == 0 else O     # colours alternate
+                a_side = X if i % 2 == 0 else O  # colours alternate
                 if rec["winner"] == DRAW:
                     draws += 1
                 elif rec["winner"] == a_side:
@@ -309,14 +355,38 @@ class TestMatch(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             paths = [os.path.join(tmp, f"{n}.jsonl") for n in "ab"]
             for path in paths:
-                run_cli(["match", "--a", "greedy", "--b", "random",
-                         "--games", "5", "--seed", "11", "--out", path])
+                run_cli(
+                    [
+                        "match",
+                        "--a",
+                        "greedy",
+                        "--b",
+                        "random",
+                        "--games",
+                        "5",
+                        "--seed",
+                        "11",
+                        "--out",
+                        path,
+                    ]
+                )
             self.assertEqual(read_jsonl(paths[0]), read_jsonl(paths[1]))
 
     def test_no_alternate_keeps_a_on_x(self):
-        code, stdout, _ = run_cli(["match", "--a", "random", "--b", "random",
-                                   "--games", "4", "--seed", "2",
-                                   "--no-alternate"])
+        code, stdout, _ = run_cli(
+            [
+                "match",
+                "--a",
+                "random",
+                "--b",
+                "random",
+                "--games",
+                "4",
+                "--seed",
+                "2",
+                "--no-alternate",
+            ]
+        )
         self.assertEqual(code, 0)
         counts = summary_counts(stdout)
         self.assertEqual(sum(counts["as_x"]), 4)
@@ -324,26 +394,57 @@ class TestMatch(unittest.TestCase):
         self.assertNotIn("wrote", stdout)
 
     def test_module_attribute_agent(self):
-        code, stdout, _ = run_cli(["match", "--a", "fake_agent:FirstLegal",
-                                   "--b", "fake_agent:make_agent",
-                                   "--games", "2", "--quiet"])
+        code, stdout, _ = run_cli(
+            [
+                "match",
+                "--a",
+                "fake_agent:FirstLegal",
+                "--b",
+                "fake_agent:make_agent",
+                "--games",
+                "2",
+                "--quiet",
+            ]
+        )
         self.assertEqual(code, 0)
         self.assertIn("first-legal vs last-legal over 2 games", stdout)
 
     def test_ctrl_c_exits_130(self):
-        code, _, _ = run_cli(["match", "--a", "fake_agent:Interrupts",
-                              "--b", "random", "--games", "1"])
+        code, _, _ = run_cli(
+            [
+                "match",
+                "--a",
+                "fake_agent:Interrupts",
+                "--b",
+                "random",
+                "--games",
+                "1",
+            ]
+        )
         self.assertEqual(code, 130)
 
 
 class TestSelfplay(unittest.TestCase):
-
     def test_counts_and_records_agree(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = os.path.join(tmp, "self.jsonl")
             code, stdout, stderr = run_cli(
-                ["selfplay", "--agent", "random", "--games", "12",
-                 "--seed", "3", "--size", "4", "-k", "3", "--out", out])
+                [
+                    "selfplay",
+                    "--agent",
+                    "random",
+                    "--games",
+                    "12",
+                    "--seed",
+                    "3",
+                    "--size",
+                    "4",
+                    "-k",
+                    "3",
+                    "--out",
+                    out,
+                ]
+            )
             self.assertEqual(code, 0)
             self.assertEqual(stderr, "")
             self.assertIn("12 games of random", stdout)
@@ -355,22 +456,35 @@ class TestSelfplay(unittest.TestCase):
             self.assertEqual(len(records), 12)
             tally = {X: 0, O: 0, DRAW: 0}
             for rec in records:
-                self.assertEqual((rec["rows"], rec["cols"], rec["k"]),
-                                 (4, 4, 3))
+                self.assertEqual(
+                    (rec["rows"], rec["cols"], rec["k"]), (4, 4, 3)
+                )
                 self.assertEqual(replay_record(rec).winner, rec["winner"])
                 tally[rec["winner"]] += 1
             self.assertEqual(printed, (tally[X], tally[O], tally[DRAW]))
 
     def test_same_seed_same_file(self):
         with tempfile.TemporaryDirectory() as tmp:
-            runs = [(os.path.join(tmp, f"{n}.jsonl"), seed)
-                    for n, seed in (("a", "5"), ("b", "5"), ("c", "6"))]
+            runs = [
+                (os.path.join(tmp, f"{n}.jsonl"), seed)
+                for n, seed in (("a", "5"), ("b", "5"), ("c", "6"))
+            ]
             paths = [path for path, _ in runs]
             for path, seed in runs:
-                run_cli(["selfplay", "--agent", "noisy:0.5:greedy",
-                         "--games", "8", "--seed", seed, "--out", path])
-            with open(paths[0]) as a, open(paths[1]) as b, \
-                    open(paths[2]) as c:
+                run_cli(
+                    [
+                        "selfplay",
+                        "--agent",
+                        "noisy:0.5:greedy",
+                        "--games",
+                        "8",
+                        "--seed",
+                        seed,
+                        "--out",
+                        path,
+                    ]
+                )
+            with open(paths[0]) as a, open(paths[1]) as b, open(paths[2]) as c:
                 first, second, other = a.read(), b.read(), c.read()
             self.assertEqual(first, second)
             self.assertNotEqual(first, other)
@@ -381,8 +495,17 @@ class TestSelfplay(unittest.TestCase):
             cwd = os.getcwd()
             os.chdir(tmp)
             try:
-                code, stdout, _ = run_cli(["selfplay", "--agent", "random",
-                                           "--games", "3", "--seed", "1"])
+                code, stdout, _ = run_cli(
+                    [
+                        "selfplay",
+                        "--agent",
+                        "random",
+                        "--games",
+                        "3",
+                        "--seed",
+                        "1",
+                    ]
+                )
             finally:
                 os.chdir(cwd)
             self.assertEqual(code, 0)

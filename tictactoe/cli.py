@@ -1,10 +1,10 @@
 """Command line front end.
 
-    python3 -m tictactoe play --size 5 --k 4 --opponent negamax:5
-    python3 -m tictactoe match --a mynet:agent --b greedy --games 400
-    python3 -m tictactoe selfplay --games 20000 --out data.jsonl
-    python3 -m tictactoe solve --size 3
-    python3 -m tictactoe bench --size 4 --k 4
+python3 -m tictactoe play --size 5 --k 4 --opponent negamax:5
+python3 -m tictactoe match --a mynet:agent --b greedy --games 400
+python3 -m tictactoe selfplay --games 20000 --out data.jsonl
+python3 -m tictactoe solve --size 3
+python3 -m tictactoe bench --size 4 --k 4
 """
 
 from __future__ import annotations
@@ -21,18 +21,33 @@ from .search import Negamax
 
 
 def _shape_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--size", type=int, default=3, metavar="N",
-                   help="board is N x N unless --rows/--cols are given (default 3)")
+    p.add_argument(
+        "--size",
+        type=int,
+        default=3,
+        metavar="N",
+        help="board is N x N unless --rows/--cols are given (default 3)",
+    )
     p.add_argument("--rows", type=int, default=None)
     p.add_argument("--cols", type=int, default=None)
-    p.add_argument("-k", "--k", type=int, default=None, metavar="K",
-                   help="stones in a row needed to win (default: the shorter side)")
+    p.add_argument(
+        "-k",
+        "--k",
+        type=int,
+        default=None,
+        metavar="K",
+        help="stones in a row needed to win (default: the shorter side)",
+    )
     p.add_argument("--seed", type=int, default=None)
 
 
 def _shape(args) -> tuple:
     rows = args.rows if args.rows is not None else args.size
-    cols = args.cols if args.cols is not None else (args.rows if args.rows is not None else args.size)
+    cols = (
+        args.cols
+        if args.cols is not None
+        else (args.rows if args.rows is not None else args.size)
+    )
     return rows, cols, args.k
 
 
@@ -41,6 +56,7 @@ def _color(stream=sys.stdout) -> bool:
 
 
 # ---------------------------------------------------------------- play
+
 
 def cmd_play(args) -> int:
     rows, cols, k = _shape(args)
@@ -51,8 +67,10 @@ def cmd_play(args) -> int:
     human_side = X if args.side.upper() == "X" else O
     color = _color()
 
-    print("\n%dx%d, %d in a row. You are %s against %s."
-          % (board.rows, board.cols, board.k, SYMBOL[human_side], engine.name))
+    print(
+        "\n%dx%d, %d in a row. You are %s against %s."
+        % (board.rows, board.cols, board.k, SYMBOL[human_side], engine.name)
+    )
     print("Enter a cell like b2. 'undo' takes back, 'quit' leaves.\n")
 
     while not board.is_terminal:
@@ -76,9 +94,15 @@ def cmd_play(args) -> int:
             t = time.perf_counter()
             move = engine.select(board)
             why = engine.explain(board)
-            print(f"{engine.name} plays {board.label(move)}"
-                  + (f"   [{why}]" if why and args.verbose else "")
-                  + ("   (%.2fs)" % (time.perf_counter() - t) if args.verbose else ""))
+            print(
+                f"{engine.name} plays {board.label(move)}"
+                + (f"   [{why}]" if why and args.verbose else "")
+                + (
+                    "   (%.2fs)" % (time.perf_counter() - t)
+                    if args.verbose
+                    else ""
+                )
+            )
             print()
         board.push(move)
 
@@ -87,13 +111,22 @@ def cmd_play(args) -> int:
     if board.winner == DRAW:
         print("Drawn.")
     elif board.winner == human_side:
-        print("You win on {}.".format("-".join(board.label(i) for i in board.win_line)))
+        print(
+            "You win on {}.".format(
+                "-".join(board.label(i) for i in board.win_line)
+            )
+        )
     else:
-        print("{} wins on {}.".format(engine.name, "-".join(board.label(i) for i in board.win_line)))
+        print(
+            "{} wins on {}.".format(
+                engine.name, "-".join(board.label(i) for i in board.win_line)
+            )
+        )
     return 0
 
 
 # --------------------------------------------------------------- match
+
 
 def cmd_match(args) -> int:
     rows, cols, k = _shape(args)
@@ -110,13 +143,24 @@ def cmd_match(args) -> int:
         sys.stderr.write("\r  %d/%d  score %.3f " % (done, total, res.score))
         sys.stderr.flush()
 
-    res = play_match(a, b, args.games, rows, cols, k,
-                     alternate=not args.no_alternate, records=records, progress=progress)
+    res = play_match(
+        a,
+        b,
+        args.games,
+        rows,
+        cols,
+        k,
+        alternate=not args.no_alternate,
+        records=records,
+        progress=progress,
+    )
     if not args.quiet and _color(sys.stderr):
         sys.stderr.write("\r" + " " * 40 + "\r")
 
     print(res.summary(a.name, b.name))
-    print(f"  {time.perf_counter() - started:.2f}s ({args.games / max(1e-9, time.perf_counter() - started):.1f} games/s)")
+    print(
+        f"  {time.perf_counter() - started:.2f}s ({args.games / max(1e-9, time.perf_counter() - started):.1f} games/s)"
+    )
     if records is not None:
         _write_records(records, args.out)
         print("  wrote %d games to %s" % (len(records), args.out))
@@ -125,6 +169,7 @@ def cmd_match(args) -> int:
 
 # ------------------------------------------------------------ selfplay
 
+
 def cmd_selfplay(args) -> int:
     rows, cols, k = _shape(args)
     started = time.perf_counter()
@@ -132,7 +177,9 @@ def cmd_selfplay(args) -> int:
     n = 0
     handle = open(args.out, "w") if args.out else None
     try:
-        for rec in selfplay(args.agent, args.games, rows, cols, k, seed=args.seed):
+        for rec in selfplay(
+            args.agent, args.games, rows, cols, k, seed=args.seed
+        ):
             counts[rec.winner] = counts.get(rec.winner, 0) + 1
             n += 1
             if handle is not None:
@@ -146,11 +193,19 @@ def cmd_selfplay(args) -> int:
     if not args.quiet and _color(sys.stderr):
         sys.stderr.write("\r" + " " * 30 + "\r")
     elapsed = time.perf_counter() - started
-    print("%d games of %s in %.2fs (%.0f games/s)" % (n, args.agent, elapsed, n / max(1e-9, elapsed)))
-    print("  X %d   O %d   drawn %d" % (counts.get(X, 0), counts.get(O, 0), counts.get(DRAW, 0)))
+    print(
+        "%d games of %s in %.2fs (%.0f games/s)"
+        % (n, args.agent, elapsed, n / max(1e-9, elapsed))
+    )
+    print(
+        "  X %d   O %d   drawn %d"
+        % (counts.get(X, 0), counts.get(O, 0), counts.get(DRAW, 0))
+    )
     if args.out:
-        print(f"  wrote {args.out} -- one JSON game per line; tictactoe.replay() turns each into"
-              " (board, move, value) training triples")
+        print(
+            f"  wrote {args.out} -- one JSON game per line; tictactoe.replay() turns each into"
+            " (board, move, value) training triples"
+        )
     return 0
 
 
@@ -161,6 +216,7 @@ def _write_records(records, path: str) -> None:
 
 
 # --------------------------------------------------------------- solve
+
 
 def cmd_solve(args) -> int:
     rows, cols, k = _shape(args)
@@ -173,10 +229,21 @@ def cmd_solve(args) -> int:
     started = time.perf_counter()
     per_move = engine.evaluate_moves(board)
     result = engine.search(board)
-    print("{} to move: {}{}".format(SYMBOL[board.to_move], result.outcome,
-                                "" if result.exact else "  (horizon-limited estimate)"))
-    print("  best %s   %d nodes   %.2fs" % (board.label(result.move) if result.move is not None else "-",
-                                            engine.nodes, time.perf_counter() - started))
+    print(
+        "{} to move: {}{}".format(
+            SYMBOL[board.to_move],
+            result.outcome,
+            "" if result.exact else "  (horizon-limited estimate)",
+        )
+    )
+    print(
+        "  best %s   %d nodes   %.2fs"
+        % (
+            board.label(result.move) if result.move is not None else "-",
+            engine.nodes,
+            time.perf_counter() - started,
+        )
+    )
     print()
     width = max(len(board.label(m)) for m in per_move) if per_move else 4
     for m in sorted(per_move):
@@ -186,6 +253,7 @@ def cmd_solve(args) -> int:
 
 
 # --------------------------------------------------------------- bench
+
 
 def cmd_bench(args) -> int:
     rows, cols, k = _shape(args)
@@ -200,24 +268,35 @@ def cmd_bench(args) -> int:
             b.push(rng.choice(b.legal_moves()))
             plies += 1
     dt = time.perf_counter() - t
-    print("  engine:   %d random games, %d moves in %.2fs -> %.0f moves/s"
-          % (args.games, plies, dt, plies / max(1e-9, dt)))
+    print(
+        "  engine:   %d random games, %d moves in %.2fs -> %.0f moves/s"
+        % (args.games, plies, dt, plies / max(1e-9, dt))
+    )
 
     engine = Negamax(max_depth=args.depth)
     b = Board(rows, cols, k)
     t = time.perf_counter()
     r = engine.search(b)
     dt = time.perf_counter() - t
-    print("  search:   depth %d from the empty board, %d nodes in %.2fs -> %.0f nodes/s"
-          % (r.depth, r.nodes, dt, r.nodes / max(1e-9, dt)))
-    print("            {}{}".format(r.outcome, "" if r.exact else " (horizon-limited)"))
+    print(
+        "  search:   depth %d from the empty board, %d nodes in %.2fs -> %.0f nodes/s"
+        % (r.depth, r.nodes, dt, r.nodes / max(1e-9, dt))
+    )
+    print(
+        "            {}{}".format(
+            r.outcome, "" if r.exact else " (horizon-limited)"
+        )
+    )
 
     try:
         import numpy  # noqa: F401
         import numpy as np
 
         from .env import BatchEnv
-        env = BatchEnv(args.batch, rows, cols, k, opponent_spec=None, seed=args.seed)
+
+        env = BatchEnv(
+            args.batch, rows, cols, k, opponent_spec=None, seed=args.seed
+        )
         env.reset()
         t = time.perf_counter()
         moves = 0
@@ -227,14 +306,17 @@ def cmd_bench(args) -> int:
             env.step(actions)
             moves += env.n
         dt = time.perf_counter() - t
-        print("  batchenv: %d envs x %d steps = %d moves in %.2fs -> %.0f moves/s"
-              % (args.batch, args.steps, moves, dt, moves / max(1e-9, dt)))
+        print(
+            "  batchenv: %d envs x %d steps = %d moves in %.2fs -> %.0f moves/s"
+            % (args.batch, args.steps, moves, dt, moves / max(1e-9, dt))
+        )
     except ImportError:
         print("  batchenv: skipped (numpy not installed)")
     return 0
 
 
 # ---------------------------------------------------------------- main
+
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -249,14 +331,17 @@ def build_parser() -> argparse.ArgumentParser:
   time:0.5              alpha-beta with a per-move time budget in seconds
   noisy:0.2:perfect     any agent, played at random 20%% of the time
   mymodule:factory      your own -- an Agent, an Agent subclass, or a factory
-""")
+""",
+    )
     sub = p.add_subparsers(dest="command", required=True)
 
     q = sub.add_parser("play", help="play against an agent in the terminal")
     _shape_args(q)
     q.add_argument("--opponent", default="perfect")
     q.add_argument("--side", default="X", choices=["X", "O", "x", "o"])
-    q.add_argument("-v", "--verbose", action="store_true", help="show what the engine saw")
+    q.add_argument(
+        "-v", "--verbose", action="store_true", help="show what the engine saw"
+    )
     q.set_defaults(func=cmd_play)
 
     q = sub.add_parser("match", help="pit two agents against each other")
@@ -264,28 +349,46 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--a", required=True, help="agent spec for player A")
     q.add_argument("--b", required=True, help="agent spec for player B")
     q.add_argument("--games", type=int, default=100)
-    q.add_argument("--no-alternate", action="store_true", help="do not swap colours between games")
-    q.add_argument("--out", default=None, metavar="FILE.jsonl", help="also record the games")
+    q.add_argument(
+        "--no-alternate",
+        action="store_true",
+        help="do not swap colours between games",
+    )
+    q.add_argument(
+        "--out",
+        default=None,
+        metavar="FILE.jsonl",
+        help="also record the games",
+    )
     q.add_argument("--quiet", action="store_true")
     q.set_defaults(func=cmd_match)
 
     q = sub.add_parser("selfplay", help="generate games as training data")
     _shape_args(q)
-    q.add_argument("--agent", default="noisy:0.25:perfect",
-                   help="agent playing both sides (default: noisy:0.25:perfect)")
+    q.add_argument(
+        "--agent",
+        default="noisy:0.25:perfect",
+        help="agent playing both sides (default: noisy:0.25:perfect)",
+    )
     q.add_argument("--games", type=int, default=1000)
     q.add_argument("--out", default=None, metavar="FILE.jsonl")
     q.add_argument("--quiet", action="store_true")
     q.set_defaults(func=cmd_selfplay)
 
-    q = sub.add_parser("solve", help="evaluate a position and every legal reply")
+    q = sub.add_parser(
+        "solve", help="evaluate a position and every legal reply"
+    )
     _shape_args(q)
-    q.add_argument("moves", nargs="*", help="moves already played, e.g. b2 a1 c3")
+    q.add_argument(
+        "moves", nargs="*", help="moves already played, e.g. b2 a1 c3"
+    )
     q.add_argument("--depth", type=int, default=None)
     q.add_argument("--time", type=float, default=None, metavar="SECONDS")
     q.set_defaults(func=cmd_solve)
 
-    q = sub.add_parser("bench", help="measure engine, search and env throughput")
+    q = sub.add_parser(
+        "bench", help="measure engine, search and env throughput"
+    )
     _shape_args(q)
     q.add_argument("--games", type=int, default=2000)
     q.add_argument("--depth", type=int, default=6)

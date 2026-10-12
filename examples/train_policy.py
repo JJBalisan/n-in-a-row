@@ -34,7 +34,9 @@ WEIGHTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "policy.npz")
 class Policy:
     """One hidden layer. Small enough to read, big enough to solve 3x3."""
 
-    def __init__(self, n_in: int, n_hidden: int, n_out: int, rng: np.random.Generator):
+    def __init__(
+        self, n_in: int, n_hidden: int, n_out: int, rng: np.random.Generator
+    ):
         self.W1 = rng.normal(0, np.sqrt(2.0 / n_in), (n_in, n_hidden))
         self.b1 = np.zeros(n_hidden)
         self.W2 = rng.normal(0, np.sqrt(1.0 / n_hidden), (n_hidden, n_out))
@@ -51,8 +53,16 @@ class Policy:
         e = np.exp(z) * mask
         return e / np.maximum(e.sum(axis=-1, keepdims=True), 1e-12)
 
-    def step(self, x, mask, actions, advantage, lr: float,
-             entropy: float = 0.01, l2: float = 1e-5):
+    def step(
+        self,
+        x,
+        mask,
+        actions,
+        advantage,
+        lr: float,
+        entropy: float = 0.01,
+        l2: float = 1e-5,
+    ):
         h, z = self.logits(x)
         z = np.where(mask, z, -1e9)
         z -= z.max(axis=-1, keepdims=True)
@@ -61,7 +71,7 @@ class Policy:
 
         dz = -p
         dz[np.arange(len(actions)), actions] += 1.0
-        dz *= advantage[:, None]          # REINFORCE: grad log pi(a|s) * A
+        dz *= advantage[:, None]  # REINFORCE: grad log pi(a|s) * A
 
         if entropy:
             # Without this the policy commits to one opening far too early and
@@ -94,7 +104,9 @@ class Policy:
         return p
 
 
-def rollout(policy: Policy, env: TicTacToeEnv, rng: np.random.Generator, augment: bool):
+def rollout(
+    policy: Policy, env: TicTacToeEnv, rng: np.random.Generator, augment: bool
+):
     """One game. Returns (observations, masks, actions, final reward)."""
     obs = env.reset(swap_sides=bool(rng.integers(2)))
     xs, ms, acts = [], [], []
@@ -130,11 +142,23 @@ def _augment(xs, ms, acts, env):
     return out_x, out_m, out_a
 
 
-def train(games: int, opponent_spec: str, rows: int, cols: int, k: int,
-          hidden: int, lr: float, batch: int, seed: int, augment: bool,
-          entropy: float = 0.01) -> Policy:
+def train(
+    games: int,
+    opponent_spec: str,
+    rows: int,
+    cols: int,
+    k: int,
+    hidden: int,
+    lr: float,
+    batch: int,
+    seed: int,
+    augment: bool,
+    entropy: float = 0.01,
+) -> Policy:
     rng = np.random.default_rng(seed)
-    env = TicTacToeEnv(rows, cols, k, opponent=load_agent(opponent_spec), seed=seed)
+    env = TicTacToeEnv(
+        rows, cols, k, opponent=load_agent(opponent_spec), seed=seed
+    )
     n_in = int(np.prod(env.observation_shape))
     policy = Policy(n_in, hidden, env.n_actions, rng)
 
@@ -168,8 +192,11 @@ def train(games: int, opponent_spec: str, rows: int, cols: int, k: int,
     return policy
 
 
-def evaluate(policy: Policy, spec: str, games: int, rows: int, cols: int, k: int) -> str:
+def evaluate(
+    policy: Policy, spec: str, games: int, rows: int, cols: int, k: int
+) -> str:
     from tictactoe.arena import play_match
+
     me = PolicyAgent(policy)
     them = load_agent(spec)
     res = play_match(me, them, games, rows, cols, k)
@@ -188,6 +215,7 @@ class PolicyAgent(Agent):
 
     def select(self, board) -> int:
         from tictactoe.env import encode, legal_mask
+
         x = encode(board).reshape(1, -1).astype(np.float64)
         m = legal_mask(board)[None, :]
         p = self.policy.probs(x, m)[0]
@@ -200,7 +228,8 @@ def agent() -> PolicyAgent:
     """Entry point for ``--opponent examples.train_policy:agent``."""
     if not os.path.exists(WEIGHTS):
         raise FileNotFoundError(
-            f"no trained weights at {WEIGHTS} -- run: python3 examples/train_policy.py")
+            f"no trained weights at {WEIGHTS} -- run: python3 examples/train_policy.py"
+        )
     return PolicyAgent(Policy.load(WEIGHTS))
 
 
@@ -215,23 +244,47 @@ def main(argv=None) -> int:
     p.add_argument("--batch", type=int, default=64)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--no-augment", action="store_true")
-    p.add_argument("--entropy", type=float, default=0.01,
-                   help="entropy bonus; stops the policy collapsing onto one opening")
+    p.add_argument(
+        "--entropy",
+        type=float,
+        default=0.01,
+        help="entropy bonus; stops the policy collapsing onto one opening",
+    )
     p.add_argument("--eval-games", type=int, default=200)
     args = p.parse_args(argv)
     rows = cols = args.size
     k = args.k or min(rows, cols)
 
-    print("training a %d-unit policy on %dx%d (k=%d) against %s"
-          % (args.hidden, rows, cols, k, args.opponent))
-    policy = train(args.games, args.opponent, rows, cols, k,
-                   args.hidden, args.lr, args.batch, args.seed,
-                   not args.no_augment, args.entropy)
+    print(
+        "training a %d-unit policy on %dx%d (k=%d) against %s"
+        % (args.hidden, rows, cols, k, args.opponent)
+    )
+    policy = train(
+        args.games,
+        args.opponent,
+        rows,
+        cols,
+        k,
+        args.hidden,
+        args.lr,
+        args.batch,
+        args.seed,
+        not args.no_augment,
+        args.entropy,
+    )
     policy.save(WEIGHTS)
     print(f"saved {WEIGHTS}\n")
     for spec in ("random", "greedy", "perfect"):
-        print(evaluate(policy, spec, args.eval_games if spec != "perfect" else 40,
-                       rows, cols, k))
+        print(
+            evaluate(
+                policy,
+                spec,
+                args.eval_games if spec != "perfect" else 40,
+                rows,
+                cols,
+                k,
+            )
+        )
     return 0
 
 

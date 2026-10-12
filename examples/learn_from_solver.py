@@ -31,7 +31,9 @@ from tictactoe.env import dihedral, encode, legal_mask
 from tictactoe.game import Board
 from tictactoe.search import Negamax
 
-WEIGHTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "solver_policy.npz")
+WEIGHTS = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "solver_policy.npz"
+)
 
 
 def collect_positions(rows: int, cols: int, k: int, games: int, seed: int):
@@ -63,10 +65,16 @@ def label(positions, depth, augment: bool):
         obs = encode(b)
         mask = legal_mask(b)
         value = np.sign(best) if abs(best) > 1e-9 else 0.0
-        variants = (dihedral(obs, target, b.rows, b.cols) if augment
-                    else [(obs, target)])
-        masks = (dihedral(obs, mask.astype(np.float32), b.rows, b.cols) if augment
-                 else [(obs, mask.astype(np.float32))])
+        variants = (
+            dihedral(obs, target, b.rows, b.cols)
+            if augment
+            else [(obs, target)]
+        )
+        masks = (
+            dihedral(obs, mask.astype(np.float32), b.rows, b.cols)
+            if augment
+            else [(obs, mask.astype(np.float32))]
+        )
         for (o_t, p_t), (_, m_t) in zip(variants, masks):
             xs.append(o_t.reshape(-1))
             ms.append(m_t.astype(bool))
@@ -74,8 +82,12 @@ def label(positions, depth, augment: bool):
             vs.append(value)
         if n % 500 == 0:
             print("  labelled %d/%d positions" % (n, len(positions)))
-    return (np.asarray(xs, np.float64), np.asarray(ms, bool),
-            np.asarray(ps, np.float64), np.asarray(vs, np.float64))
+    return (
+        np.asarray(xs, np.float64),
+        np.asarray(ms, bool),
+        np.asarray(ps, np.float64),
+        np.asarray(vs, np.float64),
+    )
 
 
 def fit(policy: Policy, X, M, P, epochs: int, batch: int, lr: float, seed: int):
@@ -86,7 +98,7 @@ def fit(policy: Policy, X, M, P, epochs: int, batch: int, lr: float, seed: int):
         order = rng.permutation(n)
         loss_sum = 0.0
         for start in range(0, n, batch):
-            idx = order[start:start + batch]
+            idx = order[start : start + batch]
             x, m, target = X[idx], M[idx], P[idx]
             h, z = policy.logits(x)
             z = np.where(m, z, -1e9)
@@ -112,7 +124,8 @@ def agent() -> PolicyAgent:
     """Entry point for ``--opponent examples.learn_from_solver:agent``."""
     if not os.path.exists(WEIGHTS):
         raise FileNotFoundError(
-            f"no trained weights at {WEIGHTS} -- run: python3 examples/learn_from_solver.py")
+            f"no trained weights at {WEIGHTS} -- run: python3 examples/learn_from_solver.py"
+        )
     return PolicyAgent(Policy.load(WEIGHTS))
 
 
@@ -122,10 +135,18 @@ def main(argv=None) -> int:
     p.add_argument("--rows", type=int, default=None)
     p.add_argument("--cols", type=int, default=None)
     p.add_argument("-k", "--k", type=int, default=None)
-    p.add_argument("--walks", type=int, default=3000,
-                   help="random games walked to gather distinct positions")
-    p.add_argument("--depth", type=int, default=None,
-                   help="teacher search depth (default: solve exactly)")
+    p.add_argument(
+        "--walks",
+        type=int,
+        default=3000,
+        help="random games walked to gather distinct positions",
+    )
+    p.add_argument(
+        "--depth",
+        type=int,
+        default=None,
+        help="teacher search depth (default: solve exactly)",
+    )
     p.add_argument("--hidden", type=int, default=128)
     p.add_argument("--epochs", type=int, default=30)
     p.add_argument("--batch", type=int, default=256)
@@ -139,16 +160,22 @@ def main(argv=None) -> int:
     cols = args.cols or rows
     k = args.k or min(rows, cols)
 
-    print("gathering positions from %d random games on %dx%d (k=%d)"
-          % (args.walks, rows, cols, k))
+    print(
+        "gathering positions from %d random games on %dx%d (k=%d)"
+        % (args.walks, rows, cols, k)
+    )
     positions = collect_positions(rows, cols, k, args.walks, args.seed)
     print("  %d distinct positions\n" % len(positions))
 
-    print("labelling with the %s engine" % ("exact" if args.depth is None
-                                            else "depth-%d" % args.depth))
+    print(
+        "labelling with the %s engine"
+        % ("exact" if args.depth is None else "depth-%d" % args.depth)
+    )
     X, M, P, _V = label(positions, args.depth, not args.no_augment)
-    print("  %d training examples (%s augmentation)\n"
-          % (len(X), "no" if args.no_augment else "8x"))
+    print(
+        "  %d training examples (%s augmentation)\n"
+        % (len(X), "no" if args.no_augment else "8x")
+    )
 
     rng = np.random.default_rng(args.seed)
     policy = Policy(X.shape[1], args.hidden, rows * cols, rng)
@@ -158,11 +185,20 @@ def main(argv=None) -> int:
     print(f"saved {WEIGHTS}\n")
 
     from tictactoe.arena import play_match
+
     me = PolicyAgent(policy)
     for spec in ("random", "greedy", "perfect"):
         them = load_agent(spec, random.Random(0))
-        games = args.eval_games if spec != "perfect" else max(40, args.eval_games // 4)
-        print(play_match(me, them, games, rows, cols, k).summary("distilled", them.name))
+        games = (
+            args.eval_games
+            if spec != "perfect"
+            else max(40, args.eval_games // 4)
+        )
+        print(
+            play_match(me, them, games, rows, cols, k).summary(
+                "distilled", them.name
+            )
+        )
     return 0
 
 

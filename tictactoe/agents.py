@@ -75,8 +75,10 @@ class GreedyAgent(Agent):
             for r, c in (board.coord(m) for m in moves)
         )
         near = [
-            m for m in moves
-            if ((board.coord(m)[0] - cr) ** 2 + (board.coord(m)[1] - cc) ** 2) == best
+            m
+            for m in moves
+            if ((board.coord(m)[0] - cr) ** 2 + (board.coord(m)[1] - cc) ** 2)
+            == best
         ]
         return self.rng.choice(near)
 
@@ -84,8 +86,13 @@ class GreedyAgent(Agent):
 class NegamaxAgent(Agent):
     """Alpha-beta search. ``depth=None`` solves exactly on small boards."""
 
-    def __init__(self, depth: int | None = None, time_limit: float | None = None,
-                 epsilon: float = 0.0, rng: random.Random | None = None):
+    def __init__(
+        self,
+        depth: int | None = None,
+        time_limit: float | None = None,
+        epsilon: float = 0.0,
+        rng: random.Random | None = None,
+    ):
         self.engine = Negamax(max_depth=depth, time_limit=time_limit)
         self.epsilon = epsilon
         self.rng = rng or random.Random()
@@ -109,7 +116,11 @@ class NegamaxAgent(Agent):
         if r is None:
             return "played at random (epsilon)"
         return "%s, depth %d, %d nodes, %.2fs%s" % (
-            r.outcome, r.depth, r.nodes, r.seconds, "" if r.exact else " (horizon-limited)"
+            r.outcome,
+            r.depth,
+            r.nodes,
+            r.seconds,
+            "" if r.exact else " (horizon-limited)",
         )
 
 
@@ -129,7 +140,9 @@ class HumanAgent(Agent):
 
     name = "human"
 
-    def __init__(self, prompt: str = "your move", input_fn=input, output_fn=print):
+    def __init__(
+        self, prompt: str = "your move", input_fn=input, output_fn=print
+    ):
         self.prompt = prompt
         self.input_fn = input_fn
         self.output_fn = output_fn
@@ -137,7 +150,9 @@ class HumanAgent(Agent):
     def select(self, board: Board) -> int:
         while True:
             try:
-                raw = self.input_fn(f"{self.prompt} ({board.label(board.legal_moves()[0])}) > ")
+                raw = self.input_fn(
+                    f"{self.prompt} ({board.label(board.legal_moves()[0])}) > "
+                )
             except (EOFError, KeyboardInterrupt):
                 raise SystemExit("\nstopped")
             cmd = raw.strip().lower()
@@ -146,8 +161,10 @@ class HumanAgent(Agent):
             if cmd in ("u", "undo"):
                 raise Undo()
             if cmd in ("?", "h", "help"):
-                self.output_fn("enter a cell like b2, or 2,3, or a bare index; "
-                               "'undo' takes back a move, 'quit' leaves")
+                self.output_fn(
+                    "enter a cell like b2, or 2,3, or a bare index; "
+                    "'undo' takes back a move, 'quit' leaves"
+                )
                 continue
             try:
                 return board.parse_move(raw)
@@ -207,7 +224,9 @@ def load_agent(spec: str, rng: random.Random | None = None) -> Agent:
     if not tail:
         raise ValueError(
             "unknown agent {!r} -- expected one of {}, negamax:D, time:S, "
-            "noisy:P:AGENT, or module:attribute".format(spec, ", ".join(sorted(BUILTINS)))
+            "noisy:P:AGENT, or module:attribute".format(
+                spec, ", ".join(sorted(BUILTINS))
+            )
         )
     module = importlib.import_module(head)
     obj = getattr(module, tail)
@@ -225,7 +244,9 @@ def load_agent(spec: str, rng: random.Random | None = None) -> Agent:
 
 
 class NoisyAgent(Agent):
-    def __init__(self, base: Agent, epsilon: float, rng: random.Random | None = None):
+    def __init__(
+        self, base: Agent, epsilon: float, rng: random.Random | None = None
+    ):
         self.base = base
         self.epsilon = epsilon
         self.rng = rng or random.Random()

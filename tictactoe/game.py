@@ -42,7 +42,8 @@ def _zobrist(rows: int, cols: int):
     if table is None:
         rng = random.Random((rows * 73856093) ^ (cols * 19349663) ^ 0x7CAC70E)
         table = tuple(
-            (0, rng.getrandbits(64), rng.getrandbits(64)) for _ in range(rows * cols)
+            (0, rng.getrandbits(64), rng.getrandbits(64))
+            for _ in range(rows * cols)
         )
         _ZOBRIST_CACHE[key] = table
     return table
@@ -67,7 +68,9 @@ def windows(rows: int, cols: int, k: int) -> tuple[tuple[int, ...], ...]:
                 er, ec = r + dr * (k - 1), c + dc * (k - 1)
                 if not (0 <= er < rows and 0 <= ec < cols):
                     continue
-                out.append(tuple((r + dr * i) * cols + (c + dc * i) for i in range(k)))
+                out.append(
+                    tuple((r + dr * i) * cols + (c + dc * i) for i in range(k))
+                )
     got = tuple(out)
     _WINDOW_CACHE[key] = got
     return got
@@ -112,7 +115,9 @@ class Board:
         "winner",
     )
 
-    def __init__(self, rows: int = 3, cols: int | None = None, k: int | None = None):
+    def __init__(
+        self, rows: int = 3, cols: int | None = None, k: int | None = None
+    ):
         cols = rows if cols is None else cols
         k = min(rows, cols) if k is None else k
         if rows < 1 or cols < 1:
@@ -129,7 +134,7 @@ class Board:
         self.k = k
         self.cells: list[int] = [EMPTY] * (rows * cols)
         self.to_move = X
-        self.winner: int | None = None   # None = in play, 0 = draw, X or O = won
+        self.winner: int | None = None  # None = in play, 0 = draw, X or O = won
         self.win_line: tuple[int, ...] | None = None
         self.last_move: int | None = None
         self._history: list[tuple] = []
@@ -181,7 +186,9 @@ class Board:
         if self.winner is not None:
             raise InvalidMove("the game is already over")
         if not 0 <= move < self.size:
-            raise InvalidMove("move %r is off a %dx%d board" % (move, self.rows, self.cols))
+            raise InvalidMove(
+                "move %r is off a %dx%d board" % (move, self.rows, self.cols)
+            )
         if self.cells[move] != EMPTY:
             raise InvalidMove(f"{self.label(move)} is already taken")
 
@@ -223,7 +230,11 @@ class Board:
             run = [idx]
             for sign in (1, -1):
                 rr, cc = r + dr * sign, c + dc * sign
-                while 0 <= rr < rows and 0 <= cc < cols and cells[rr * cols + cc] == player:
+                while (
+                    0 <= rr < rows
+                    and 0 <= cc < cols
+                    and cells[rr * cols + cc] == player
+                ):
                     run.append(rr * cols + cc)
                     rr += dr * sign
                     cc += dc * sign
@@ -234,7 +245,9 @@ class Board:
 
     def winning_moves(self, player: int) -> list[int]:
         """Empty cells that complete a run for ``player`` right now."""
-        return [i for i in self.legal_moves() if self.line_through_if(i, player)]
+        return [
+            i for i in self.legal_moves() if self.line_through_if(i, player)
+        ]
 
     def line_through_if(self, idx: int, player: int) -> tuple[int, ...] | None:
         """As :meth:`line_through`, hypothesising a ``player`` stone on ``idx``."""
@@ -273,8 +286,13 @@ class Board:
         return [h[0] for h in self._history]
 
     @classmethod
-    def from_moves(cls, moves: Iterable[int], rows: int = 3,
-                   cols: int | None = None, k: int | None = None) -> Board:
+    def from_moves(
+        cls,
+        moves: Iterable[int],
+        rows: int = 3,
+        cols: int | None = None,
+        k: int | None = None,
+    ) -> Board:
         b = cls(rows, cols, k)
         for m in moves:
             b.push(m)
@@ -309,7 +327,9 @@ class Board:
 
     def render(self, color: bool = False, mark_last: bool = True) -> str:
         """A grid with column letters and row numbers, sized to the board."""
-        width = max(2, len(col_label(self.cols - 1)) + 1, len(str(self.rows)) + 1)
+        width = max(
+            2, len(col_label(self.cols - 1)) + 1, len(str(self.rows)) + 1
+        )
         gutter = len(str(self.rows))
         highlight = set(self.win_line or ())
         lines = []
@@ -338,5 +358,9 @@ class Board:
 
     def __repr__(self) -> str:
         return "<Board %dx%d k=%d ply=%d to_move=%s>" % (
-            self.rows, self.cols, self.k, self.ply, SYMBOL[self.to_move]
+            self.rows,
+            self.cols,
+            self.k,
+            self.ply,
+            SYMBOL[self.to_move],
         )

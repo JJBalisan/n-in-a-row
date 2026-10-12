@@ -13,7 +13,6 @@ sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)  # so load_agent can import fake_agent
 
 import fake_agent
-
 from tictactoe.agents import (
     FunctionAgent,
     HumanAgent,
@@ -84,8 +83,13 @@ class TestHumanAgent(unittest.TestCase):
     """HumanAgent driven through its input_fn/output_fn seams."""
 
     def test_valid_move_forms(self):
-        for text, expected in [("b2", 4), ("B3", 7), ("2,3", 5), ("8", 8),
-                               ("  c1  ", 2)]:
+        for text, expected in [
+            ("b2", 4),
+            ("B3", 7),
+            ("2,3", 5),
+            ("8", 8),
+            ("  c1  ", 2),
+        ]:
             with self.subTest(text=text):
                 script = _Script(text)
                 self.assertEqual(script.agent().select(Board()), expected)
@@ -157,7 +161,7 @@ class TestNoisyAgent(unittest.TestCase):
         agent = NoisyAgent(fake_agent.LastLegal(), 0.0, random.Random(0))
         rng = random.Random(1)
         for _ in range(50):
-            board = Board(4, 4, 4)       # no one can win within 6 plies
+            board = Board(4, 4, 4)  # no one can win within 6 plies
             for _ in range(rng.randrange(7)):
                 board.push(rng.choice(board.legal_moves()))
             self.assertEqual(agent.select(board), board.legal_moves()[-1])
@@ -191,7 +195,7 @@ class TestNoisyAgent(unittest.TestCase):
 
     def test_negamax_epsilon_one_plays_at_random(self):
         agent = load_agent("noisy:1:negamax:1", random.Random(0))
-        board = Board.from_moves([0, 3, 1, 4])     # X wins at c1
+        board = Board.from_moves([0, 3, 1, 4])  # X wins at c1
         picks = {agent.select(board) for _ in range(60)}
         self.assertGreater(len(picks), 1)
         self.assertEqual(agent.explain(board), "played at random (epsilon)")

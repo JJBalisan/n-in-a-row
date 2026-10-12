@@ -17,7 +17,7 @@ class GameRecord:
     cols: int
     k: int
     moves: list[int] = field(default_factory=list)
-    winner: int | None = None      # 0 draw, 1 X, 2 O
+    winner: int | None = None  # 0 draw, 1 X, 2 O
 
     def result_for(self, player: int) -> float:
         if self.winner == DRAW:
@@ -25,14 +25,25 @@ class GameRecord:
         return 1.0 if self.winner == player else -1.0
 
     def to_json(self) -> str:
-        return json.dumps({
-            "rows": self.rows, "cols": self.cols, "k": self.k,
-            "moves": self.moves, "winner": self.winner,
-        })
+        return json.dumps(
+            {
+                "rows": self.rows,
+                "cols": self.cols,
+                "k": self.k,
+                "moves": self.moves,
+                "winner": self.winner,
+            }
+        )
 
 
-def play_game(x_agent: Agent, o_agent: Agent, rows: int = 3, cols: int | None = None,
-              k: int | None = None, on_move=None) -> GameRecord:
+def play_game(
+    x_agent: Agent,
+    o_agent: Agent,
+    rows: int = 3,
+    cols: int | None = None,
+    k: int | None = None,
+    on_move=None,
+) -> GameRecord:
     """Play one game to the end and return the move list plus the result."""
     board = Board(rows, cols, k)
     players = {X: x_agent, O: o_agent}
@@ -46,44 +57,75 @@ def play_game(x_agent: Agent, o_agent: Agent, rows: int = 3, cols: int | None = 
             a.observe(board, move)
         if on_move is not None:
             on_move(board, mover, move)
-    return GameRecord(board.rows, board.cols, board.k, board.moves_played(), board.winner)
+    return GameRecord(
+        board.rows, board.cols, board.k, board.moves_played(), board.winner
+    )
 
 
 @dataclass
 class MatchResult:
     games: int = 0
-    wins: int = 0        # for agent A
+    wins: int = 0  # for agent A
     draws: int = 0
     losses: int = 0
-    as_x: dict[str, int] = field(default_factory=lambda: {"w": 0, "d": 0, "l": 0})
-    as_o: dict[str, int] = field(default_factory=lambda: {"w": 0, "d": 0, "l": 0})
+    as_x: dict[str, int] = field(
+        default_factory=lambda: {"w": 0, "d": 0, "l": 0}
+    )
+    as_o: dict[str, int] = field(
+        default_factory=lambda: {"w": 0, "d": 0, "l": 0}
+    )
 
     @property
     def score(self) -> float:
         """Chess scoring: a win is 1, a draw is a half."""
-        return (self.wins + 0.5 * self.draws) / self.games if self.games else 0.0
+        return (
+            (self.wins + 0.5 * self.draws) / self.games if self.games else 0.0
+        )
 
     def summary(self, name_a: str, name_b: str) -> str:
         return (
             "%s vs %s over %d games: %d-%d-%d (W-D-L), score %.3f\n"
             "  as X: %d-%d-%d    as O: %d-%d-%d"
-            % (name_a, name_b, self.games, self.wins, self.draws, self.losses, self.score,
-               self.as_x["w"], self.as_x["d"], self.as_x["l"],
-               self.as_o["w"], self.as_o["d"], self.as_o["l"])
+            % (
+                name_a,
+                name_b,
+                self.games,
+                self.wins,
+                self.draws,
+                self.losses,
+                self.score,
+                self.as_x["w"],
+                self.as_x["d"],
+                self.as_x["l"],
+                self.as_o["w"],
+                self.as_o["d"],
+                self.as_o["l"],
+            )
         )
 
 
-def play_match(agent_a: Agent, agent_b: Agent, games: int = 100, rows: int = 3,
-               cols: int | None = None, k: int | None = None,
-               alternate: bool = True, records: list[GameRecord] | None = None,
-               progress=None) -> MatchResult:
+def play_match(
+    agent_a: Agent,
+    agent_b: Agent,
+    games: int = 100,
+    rows: int = 3,
+    cols: int | None = None,
+    k: int | None = None,
+    alternate: bool = True,
+    records: list[GameRecord] | None = None,
+    progress=None,
+) -> MatchResult:
     """Play ``games`` games, swapping colours each time so first-move advantage cancels."""
     res = MatchResult()
     for i in range(games):
         a_is_x = (i % 2 == 0) or not alternate
-        rec = play_game(agent_a if a_is_x else agent_b,
-                        agent_b if a_is_x else agent_a,
-                        rows, cols, k)
+        rec = play_game(
+            agent_a if a_is_x else agent_b,
+            agent_b if a_is_x else agent_a,
+            rows,
+            cols,
+            k,
+        )
         if records is not None:
             records.append(rec)
         a_side = X if a_is_x else O
@@ -104,8 +146,14 @@ def play_match(agent_a: Agent, agent_b: Agent, games: int = 100, rows: int = 3,
     return res
 
 
-def selfplay(agent_spec: str, games: int, rows: int = 3, cols: int | None = None,
-             k: int | None = None, seed: int | None = None) -> Iterator[GameRecord]:
+def selfplay(
+    agent_spec: str,
+    games: int,
+    rows: int = 3,
+    cols: int | None = None,
+    k: int | None = None,
+    seed: int | None = None,
+) -> Iterator[GameRecord]:
     """Stream games between two independently-seeded copies of one agent."""
     rng = random.Random(seed)
     for _ in range(games):

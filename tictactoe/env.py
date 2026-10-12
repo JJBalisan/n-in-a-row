@@ -22,7 +22,9 @@ N_PLANES = 3
 
 def encode(board: Board, dtype=np.float32) -> np.ndarray:
     """Canonical observation of shape ``(3, rows, cols)``."""
-    cells = np.asarray(board.cells, dtype=np.int8).reshape(board.rows, board.cols)
+    cells = np.asarray(board.cells, dtype=np.int8).reshape(
+        board.rows, board.cols
+    )
     me = board.to_move
     obs = np.zeros((N_PLANES, board.rows, board.cols), dtype=dtype)
     obs[0] = cells == me
@@ -53,7 +55,9 @@ def dihedral(obs: np.ndarray, policy: np.ndarray, rows: int, cols: int):
                 continue
             oo = np.rot90(o, rot, axes=(1, 2))
             pp = np.rot90(p, rot)
-            variants.append((np.ascontiguousarray(oo), np.ascontiguousarray(pp).reshape(-1)))
+            variants.append(
+                (np.ascontiguousarray(oo), np.ascontiguousarray(pp).reshape(-1))
+            )
     return variants
 
 
@@ -69,9 +73,16 @@ class TicTacToeEnv:
       so the agent under training only ever sees its own turns.
     """
 
-    def __init__(self, rows: int = 3, cols: int | None = None, k: int | None = None,
-                 opponent: Agent | None = None, agent_plays: int | None = X,
-                 illegal_move: str = "raise", seed: int | None = None):
+    def __init__(
+        self,
+        rows: int = 3,
+        cols: int | None = None,
+        k: int | None = None,
+        opponent: Agent | None = None,
+        agent_plays: int | None = X,
+        illegal_move: str = "raise",
+        seed: int | None = None,
+    ):
         if illegal_move not in ("raise", "lose"):
             raise ValueError("illegal_move must be 'raise' or 'lose'")
         self.rows = rows
@@ -110,7 +121,12 @@ class TicTacToeEnv:
         except InvalidMove as exc:
             if self.illegal_move == "raise":
                 raise
-            return self.observation(), -1.0, True, {"illegal": True, "error": str(exc)}
+            return (
+                self.observation(),
+                -1.0,
+                True,
+                {"illegal": True, "error": str(exc)},
+            )
 
         if self.board.is_terminal:
             return self.observation(), self._reward(mover), True, self._info()
@@ -118,7 +134,12 @@ class TicTacToeEnv:
         if self.opponent is not None:
             self._opponent_move()
             if self.board.is_terminal:
-                return self.observation(), self._reward(mover), True, self._info()
+                return (
+                    self.observation(),
+                    self._reward(mover),
+                    True,
+                    self._info(),
+                )
 
         return self.observation(), 0.0, False, self._info()
 
@@ -156,8 +177,14 @@ class TicTacToeEnv:
         return self.board.render(color=color)
 
     def clone(self) -> TicTacToeEnv:
-        env = TicTacToeEnv(self.rows, self.cols, self.k, self.opponent,
-                           self.agent_plays, self.illegal_move)
+        env = TicTacToeEnv(
+            self.rows,
+            self.cols,
+            self.k,
+            self.opponent,
+            self.agent_plays,
+            self.illegal_move,
+        )
         env.board = self.board.copy()
         return env
 
@@ -170,15 +197,27 @@ class BatchEnv:
     ``last_dones`` report what happened on the step that ended them.
     """
 
-    def __init__(self, n: int, rows: int = 3, cols: int | None = None,
-                 k: int | None = None, opponent_spec: str | None = None,
-                 seed: int | None = None, illegal_move: str = "raise"):
+    def __init__(
+        self,
+        n: int,
+        rows: int = 3,
+        cols: int | None = None,
+        k: int | None = None,
+        opponent_spec: str | None = None,
+        seed: int | None = None,
+        illegal_move: str = "raise",
+    ):
         rng = random.Random(seed)
         self.envs = [
             TicTacToeEnv(
-                rows, cols, k,
-                opponent=None if opponent_spec is None else load_agent(
-                    opponent_spec, random.Random(rng.getrandbits(32))),
+                rows,
+                cols,
+                k,
+                opponent=None
+                if opponent_spec is None
+                else load_agent(
+                    opponent_spec, random.Random(rng.getrandbits(32))
+                ),
                 illegal_move=illegal_move,
                 seed=rng.getrandbits(32),
             )
@@ -203,8 +242,12 @@ class BatchEnv:
             rewards.append(r)
             dones.append(d)
             infos.append(i)
-        return (np.stack(obs), np.asarray(rewards, dtype=np.float32),
-                np.asarray(dones, dtype=bool), infos)
+        return (
+            np.stack(obs),
+            np.asarray(rewards, dtype=np.float32),
+            np.asarray(dones, dtype=bool),
+            infos,
+        )
 
     def legal_masks(self) -> np.ndarray:
         return np.stack([e.legal_mask() for e in self.envs])

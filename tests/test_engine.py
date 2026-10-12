@@ -28,15 +28,15 @@ class TestBoard(unittest.TestCase):
         self.assertEqual(b.spec, (4, 7, 4))
         self.assertEqual(b.size, 28)
         with self.assertRaises(ValueError):
-            Board(3, 3, 4)          # k cannot exceed the longest side
-        Board(3, 5, 4)              # but it fits along the long axis
+            Board(3, 3, 4)  # k cannot exceed the longest side
+        Board(3, 5, 4)  # but it fits along the long axis
 
     def test_rows_columns_diagonals_and_antidiagonals(self):
         for moves, winner in [
-            ([0, 3, 1, 4, 2], X),          # top row
-            ([0, 1, 3, 2, 6], X),          # left column
-            ([0, 1, 4, 2, 8], X),          # main diagonal
-            ([2, 0, 4, 1, 6], X),          # anti-diagonal
+            ([0, 3, 1, 4, 2], X),  # top row
+            ([0, 1, 3, 2, 6], X),  # left column
+            ([0, 1, 4, 2, 8], X),  # main diagonal
+            ([2, 0, 4, 1, 6], X),  # anti-diagonal
         ]:
             b = Board.from_moves(moves)
             self.assertEqual(b.winner, winner, moves)
@@ -57,7 +57,7 @@ class TestBoard(unittest.TestCase):
             b.push(99)
         b2 = Board.from_moves([0, 3, 1, 4, 2])
         with self.assertRaises(InvalidMove):
-            b2.push(5)              # game is over
+            b2.push(5)  # game is over
 
     def test_push_pop_restores_everything(self):
         rng = random.Random(1)
@@ -94,7 +94,7 @@ class TestBoard(unittest.TestCase):
         self.assertEqual(len(windows(4, 4, 4)), 10)
 
     def test_winning_moves(self):
-        b = Board.from_moves([0, 3, 1])       # X on a1,b1 -- c1 completes
+        b = Board.from_moves([0, 3, 1])  # X on a1,b1 -- c1 completes
         self.assertIn(2, b.winning_moves(X))
         self.assertNotIn(2, b.winning_moves(O))
 
@@ -111,18 +111,18 @@ class TestSearch(unittest.TestCase):
             self.assertEqual(r.outcome, "draw", "opening %d" % m)
 
     def test_takes_the_win(self):
-        b = Board.from_moves([0, 4, 1])       # X threatens c1
-        b.push(8)                             # O ignores it
+        b = Board.from_moves([0, 4, 1])  # X threatens c1
+        b.push(8)  # O ignores it
         r = solve(b)
         self.assertEqual(r.move, 2)
         self.assertTrue(r.value > WIN // 2)
 
     def test_blocks_the_loss(self):
-        b = Board.from_moves([0, 4, 1])       # O must stop c1
+        b = Board.from_moves([0, 4, 1])  # O must stop c1
         self.assertEqual(solve(b).move, 2)
 
     def test_prefers_the_faster_win(self):
-        b = Board.from_moves([0, 3, 1, 4])    # X wins now at c1
+        b = Board.from_moves([0, 3, 1, 4])  # X wins now at c1
         r = solve(b)
         self.assertEqual(r.move, 2)
         self.assertEqual(r.outcome, "win in 1")
@@ -151,8 +151,9 @@ class TestSearch(unittest.TestCase):
         best = next(ln for ln in lines if ln.strip().startswith("best "))
         best_label = best.split()[1]
         rows = [ln.strip() for ln in lines if ln.startswith("  ")]
-        table = dict(r.split(None, 1) for r in rows
-                     if not r.startswith("best "))
+        table = dict(
+            r.split(None, 1) for r in rows if not r.startswith("best ")
+        )
         self.assertEqual(outcome, table[best_label])
 
     def test_table_is_not_reused_across_k(self):
@@ -162,14 +163,22 @@ class TestSearch(unittest.TestCase):
         warm = engine.evaluate_moves(Board(3, 3, 3))
         fresh = Negamax().evaluate_moves(Board(3, 3, 3))
         self.assertEqual(warm[8].outcome, "draw")
-        self.assertEqual({m: r.outcome for m, r in warm.items()},
-                         {m: r.outcome for m, r in fresh.items()})
+        self.assertEqual(
+            {m: r.outcome for m, r in warm.items()},
+            {m: r.outcome for m, r in fresh.items()},
+        )
 
 
 class TestAgents(unittest.TestCase):
     def test_specs_load(self):
-        for spec in ("random", "greedy", "perfect", "negamax:3", "time:0.05",
-                     "noisy:0.5:greedy"):
+        for spec in (
+            "random",
+            "greedy",
+            "perfect",
+            "negamax:3",
+            "time:0.05",
+            "noisy:0.5:greedy",
+        ):
             a = load_agent(spec, random.Random(0))
             self.assertIn(a.select(Board()), range(9))
 
@@ -179,8 +188,10 @@ class TestAgents(unittest.TestCase):
 
     def test_greedy_wins_and_blocks(self):
         a = load_agent("greedy", random.Random(0))
-        self.assertEqual(a.select(Board.from_moves([0, 3, 1, 4])), 2)   # X completes
-        self.assertEqual(a.select(Board.from_moves([0, 4, 1])), 2)      # O blocks
+        self.assertEqual(
+            a.select(Board.from_moves([0, 3, 1, 4])), 2
+        )  # X completes
+        self.assertEqual(a.select(Board.from_moves([0, 4, 1])), 2)  # O blocks
 
     def test_perfect_never_loses_to_random(self):
         perfect = load_agent("perfect", random.Random(0))
@@ -190,32 +201,45 @@ class TestAgents(unittest.TestCase):
 
     def test_perfect_always_draws_itself(self):
         # perfect vs perfect is deterministic, so one game is the whole test.
-        rec = play_game(load_agent("perfect", random.Random(0)),
-                        load_agent("perfect", random.Random(1)))
+        rec = play_game(
+            load_agent("perfect", random.Random(0)),
+            load_agent("perfect", random.Random(1)),
+        )
         self.assertEqual(rec.winner, DRAW)
 
     def test_perfect_never_loses_to_noisy_perfect(self):
         """Varied games: a noisy copy strays, and perfect must never lose."""
         records = []
-        res = play_match(load_agent("perfect", random.Random(0)),
-                         load_agent("noisy:0.3:perfect", random.Random(3)),
-                         6, records=records)
+        res = play_match(
+            load_agent("perfect", random.Random(0)),
+            load_agent("noisy:0.3:perfect", random.Random(3)),
+            6,
+            records=records,
+        )
         self.assertEqual(res.losses, 0, "perfect lost to noisy:0.3:perfect")
-        self.assertGreater(len({tuple(r.moves) for r in records}), 1,
-                           "every game was identical")
+        self.assertGreater(
+            len({tuple(r.moves) for r in records}),
+            1,
+            "every game was identical",
+        )
 
 
 class TestArena(unittest.TestCase):
     def test_match_accounting_adds_up(self):
-        res = play_match(load_agent("greedy", random.Random(0)),
-                         load_agent("random", random.Random(0)), 30)
+        res = play_match(
+            load_agent("greedy", random.Random(0)),
+            load_agent("random", random.Random(0)),
+            30,
+        )
         self.assertEqual(res.games, 30)
         self.assertEqual(res.wins + res.draws + res.losses, 30)
         self.assertEqual(res.as_x["w"] + res.as_o["w"], res.wins)
 
     def test_replay_targets_match_the_result(self):
-        rec = play_game(load_agent("greedy", random.Random(0)),
-                        load_agent("random", random.Random(2)))
+        rec = play_game(
+            load_agent("greedy", random.Random(0)),
+            load_agent("random", random.Random(2)),
+        )
         steps = list(replay(rec))
         self.assertEqual(len(steps), len(rec.moves))
         board, _move, value = steps[0]
@@ -240,8 +264,10 @@ def _require_numpy(test):
         import numpy  # noqa: F401
     except ImportError:
         if os.environ.get("CI"):
-            test.fail("numpy is not installed but CI is set; "
-                      "install the test extra: pip install -e '.[test]'")
+            test.fail(
+                "numpy is not installed but CI is set; "
+                "install the test extra: pip install -e '.[test]'"
+            )
         test.skipTest("numpy not installed (set CI=1 to make this a failure)")
 
 
@@ -251,26 +277,29 @@ class TestEnv(unittest.TestCase):
 
     def test_observation_is_canonical(self):
         from tictactoe.env import encode
-        b = Board.from_moves([4])            # X centre, O to move
+
+        b = Board.from_moves([4])  # X centre, O to move
         obs = encode(b)
         self.assertEqual(obs.shape, (3, 3, 3))
-        self.assertEqual(obs[0].sum(), 0)    # O (to move) has no stones
-        self.assertEqual(obs[1][1, 1], 1)    # opponent stone in the centre
-        self.assertEqual(obs[2][0, 0], 0)    # side-to-move plane is O
+        self.assertEqual(obs[0].sum(), 0)  # O (to move) has no stones
+        self.assertEqual(obs[1][1, 1], 1)  # opponent stone in the centre
+        self.assertEqual(obs[2][0, 0], 0)  # side-to-move plane is O
 
     def test_step_reward_belongs_to_the_mover(self):
         from tictactoe.env import TicTacToeEnv
+
         env = TicTacToeEnv(3)
         env.reset()
         for a in (0, 3, 1, 4):
             _, r, done, _ = env.step(a)
             self.assertFalse(done)
-        _, r, done, _ = env.step(2)           # X completes the top row
+        _, r, done, _ = env.step(2)  # X completes the top row
         self.assertTrue(done)
         self.assertEqual(r, 1.0)
 
     def test_illegal_move_can_forfeit(self):
         from tictactoe.env import TicTacToeEnv
+
         env = TicTacToeEnv(3, illegal_move="lose")
         env.reset()
         env.step(0)
@@ -282,19 +311,39 @@ class TestEnv(unittest.TestCase):
         import numpy as np
 
         from tictactoe.env import dihedral
-        self.assertEqual(len(dihedral(np.zeros((3, 3, 3), np.float32),
-                                      np.zeros(9, np.float32), 3, 3)), 8)
-        self.assertEqual(len(dihedral(np.zeros((3, 2, 5), np.float32),
-                                      np.zeros(10, np.float32), 2, 5)), 4)
+
+        self.assertEqual(
+            len(
+                dihedral(
+                    np.zeros((3, 3, 3), np.float32),
+                    np.zeros(9, np.float32),
+                    3,
+                    3,
+                )
+            ),
+            8,
+        )
+        self.assertEqual(
+            len(
+                dihedral(
+                    np.zeros((3, 2, 5), np.float32),
+                    np.zeros(10, np.float32),
+                    2,
+                    5,
+                )
+            ),
+            4,
+        )
 
     def test_symmetries_preserve_the_move(self):
         """Each transform moves the policy target with the stone it marks."""
         import numpy as np
 
         from tictactoe.env import dihedral, encode
+
         for rows, cols, moves, target, n_variants in [
-            (3, 3, [2, 3], 2, 8),        # X on c1 is the target, O on a2
-            (2, 5, [1, 7], 1, 4),        # rectangle: no transposes
+            (3, 3, [2, 3], 2, 8),  # X on c1 is the target, O on a2
+            (2, 5, [1, 7], 1, 4),  # rectangle: no transposes
         ]:
             b = Board.from_moves(moves, rows, cols)
             policy = np.zeros(rows * cols, np.float32)

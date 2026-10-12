@@ -17,8 +17,7 @@ import time
 
 try:
     import tkinter as tk
-    from tkinter import font as tkfont
-    from tkinter import messagebox, ttk
+    from tkinter import font as tkfont, messagebox, ttk
 except ImportError as exc:  # pragma: no cover
     raise SystemExit(
         "tkinter is not available for this interpreter.\n"
@@ -46,13 +45,30 @@ GOOD = "#7FBE94"
 EVEN = "#8B9382"
 BAD = "#DE7B66"
 
-PRESETS = ["human", "random", "greedy", "perfect",
-           "negamax:4", "negamax:6", "time:1.0", "noisy:0.2:perfect"]
+PRESETS = [
+    "human",
+    "random",
+    "greedy",
+    "perfect",
+    "negamax:4",
+    "negamax:6",
+    "time:1.0",
+    "noisy:0.2:perfect",
+]
 
 
 class TicTacToeGUI:
-    def __init__(self, root: tk.Tk, rows: int, cols: int, k: int,
-                 opponent_spec: str, human_side: int, show_solver: bool, seed=None):
+    def __init__(
+        self,
+        root: tk.Tk,
+        rows: int,
+        cols: int,
+        k: int,
+        opponent_spec: str,
+        human_side: int,
+        show_solver: bool,
+        seed=None,
+    ):
         self.root = root
         self.rng = random.Random(seed)
         self.board = Board(rows, cols, k)
@@ -75,7 +91,9 @@ class TicTacToeGUI:
 
         self.show_solver = tk.BooleanVar(value=show_solver)
         self.solver_check.configure(variable=self.show_solver)
-        self.show_solver.trace_add("write", lambda *_: self.new_game(keep_position=True))
+        self.show_solver.trace_add(
+            "write", lambda *_: self.new_game(keep_position=True)
+        )
 
         self.new_game()
         self.root.after(60, self._poll)
@@ -87,9 +105,20 @@ class TicTacToeGUI:
         with contextlib.suppress(tk.TclError):
             style.theme_use("clam")
         style.configure("T.TFrame", background=BG)
-        style.configure("T.TLabel", background=BG, foreground=MUTED, font=("Helvetica", 11))
-        style.configure("T.TCheckbutton", background=BG, foreground=MUTED, font=("Helvetica", 11))
-        style.map("T.TCheckbutton", background=[("active", BG)], foreground=[("active", INK)])
+        style.configure(
+            "T.TLabel", background=BG, foreground=MUTED, font=("Helvetica", 11)
+        )
+        style.configure(
+            "T.TCheckbutton",
+            background=BG,
+            foreground=MUTED,
+            font=("Helvetica", 11),
+        )
+        style.map(
+            "T.TCheckbutton",
+            background=[("active", BG)],
+            foreground=[("active", INK)],
+        )
 
         bar = ttk.Frame(self.root, style="T.TFrame", padding=(16, 14, 16, 6))
         bar.pack(fill="x")
@@ -101,44 +130,108 @@ class TicTacToeGUI:
         row1.pack(fill="x", pady=(0, 8))
         label(row1, "rows").pack(side="left")
         self.rows_var = tk.IntVar(value=self.board.rows)
-        tk.Spinbox(row1, from_=3, to=15, width=3, textvariable=self.rows_var,
-                   bg=CELL, fg=INK, buttonbackground=GRID, relief="flat",
-                   highlightthickness=0, insertbackground=INK).pack(side="left", padx=(6, 14))
+        tk.Spinbox(
+            row1,
+            from_=3,
+            to=15,
+            width=3,
+            textvariable=self.rows_var,
+            bg=CELL,
+            fg=INK,
+            buttonbackground=GRID,
+            relief="flat",
+            highlightthickness=0,
+            insertbackground=INK,
+        ).pack(side="left", padx=(6, 14))
         label(row1, "cols").pack(side="left")
         self.cols_var = tk.IntVar(value=self.board.cols)
-        tk.Spinbox(row1, from_=3, to=15, width=3, textvariable=self.cols_var,
-                   bg=CELL, fg=INK, buttonbackground=GRID, relief="flat",
-                   highlightthickness=0, insertbackground=INK).pack(side="left", padx=(6, 14))
+        tk.Spinbox(
+            row1,
+            from_=3,
+            to=15,
+            width=3,
+            textvariable=self.cols_var,
+            bg=CELL,
+            fg=INK,
+            buttonbackground=GRID,
+            relief="flat",
+            highlightthickness=0,
+            insertbackground=INK,
+        ).pack(side="left", padx=(6, 14))
         label(row1, "in a row").pack(side="left")
         self.k_var = tk.IntVar(value=self.board.k)
-        tk.Spinbox(row1, from_=3, to=15, width=3, textvariable=self.k_var,
-                   bg=CELL, fg=INK, buttonbackground=GRID, relief="flat",
-                   highlightthickness=0, insertbackground=INK).pack(side="left", padx=(6, 0))
+        tk.Spinbox(
+            row1,
+            from_=3,
+            to=15,
+            width=3,
+            textvariable=self.k_var,
+            bg=CELL,
+            fg=INK,
+            buttonbackground=GRID,
+            relief="flat",
+            highlightthickness=0,
+            insertbackground=INK,
+        ).pack(side="left", padx=(6, 0))
 
         row2 = ttk.Frame(bar, style="T.TFrame")
         row2.pack(fill="x")
         label(row2, "opponent").pack(side="left")
         self.opp_var = tk.StringVar(value=self.opponent_spec)
-        combo = ttk.Combobox(row2, textvariable=self.opp_var, width=18,
-                             values=PRESETS + ([self.opponent_spec]
-                                               if self.opponent_spec not in PRESETS else []))
+        combo = ttk.Combobox(
+            row2,
+            textvariable=self.opp_var,
+            width=18,
+            values=PRESETS
+            + (
+                [self.opponent_spec]
+                if self.opponent_spec not in PRESETS
+                else []
+            ),
+        )
         combo.pack(side="left", padx=(6, 14))
         label(row2, "you play").pack(side="left")
         self.side_var = tk.StringVar(value="X" if self.human_side == X else "O")
-        ttk.Combobox(row2, textvariable=self.side_var, width=3,
-                     values=["X", "O"], state="readonly").pack(side="left", padx=(6, 14))
+        ttk.Combobox(
+            row2,
+            textvariable=self.side_var,
+            width=3,
+            values=["X", "O"],
+            state="readonly",
+        ).pack(side="left", padx=(6, 14))
 
-        tk.Button(row2, text="New game", command=self.new_game, bg=CELL, fg=INK,
-                  activebackground=GRID, activeforeground=INK, relief="flat",
-                  highlightthickness=0, padx=12, pady=3).pack(side="right")
-        tk.Button(row2, text="Undo", command=self.undo, bg=CELL, fg=MUTED,
-                  activebackground=GRID, activeforeground=INK, relief="flat",
-                  highlightthickness=0, padx=12, pady=3).pack(side="right", padx=(0, 8))
+        tk.Button(
+            row2,
+            text="New game",
+            command=self.new_game,
+            bg=CELL,
+            fg=INK,
+            activebackground=GRID,
+            activeforeground=INK,
+            relief="flat",
+            highlightthickness=0,
+            padx=12,
+            pady=3,
+        ).pack(side="right")
+        tk.Button(
+            row2,
+            text="Undo",
+            command=self.undo,
+            bg=CELL,
+            fg=MUTED,
+            activebackground=GRID,
+            activeforeground=INK,
+            relief="flat",
+            highlightthickness=0,
+            padx=12,
+            pady=3,
+        ).pack(side="right", padx=(0, 8))
 
         row3 = ttk.Frame(bar, style="T.TFrame")
         row3.pack(fill="x", pady=(8, 0))
-        self.solver_check = ttk.Checkbutton(row3, text="show the solver's read",
-                                            style="T.TCheckbutton")
+        self.solver_check = ttk.Checkbutton(
+            row3, text="show the solver's read", style="T.TCheckbutton"
+        )
         self.solver_check.pack(side="left")
 
     def _build_board(self) -> None:
@@ -154,11 +247,13 @@ class TicTacToeGUI:
     def _build_status(self) -> None:
         bar = tk.Frame(self.root, bg=BG)
         bar.pack(fill="x", padx=16, pady=(0, 14))
-        self.status = tk.Label(bar, text="", bg=BG, fg=INK, anchor="w",
-                               font=("Helvetica", 13))
+        self.status = tk.Label(
+            bar, text="", bg=BG, fg=INK, anchor="w", font=("Helvetica", 13)
+        )
         self.status.pack(side="left")
-        self.detail = tk.Label(bar, text="", bg=BG, fg=MUTED, anchor="e",
-                               font=("Helvetica", 11))
+        self.detail = tk.Label(
+            bar, text="", bg=BG, fg=MUTED, anchor="e", font=("Helvetica", 11)
+        )
         self.detail.pack(side="right")
 
     # ---- game flow ------------------------------------------------------
@@ -173,8 +268,11 @@ class TicTacToeGUI:
             self.opponent_spec = self.opp_var.get().strip() or "perfect"
             self.human_side = X if self.side_var.get() == "X" else O
             try:
-                self.agent = (None if self.opponent_spec == "human"
-                              else load_agent(self.opponent_spec, self.rng))
+                self.agent = (
+                    None
+                    if self.opponent_spec == "human"
+                    else load_agent(self.opponent_spec, self.rng)
+                )
             except Exception as exc:
                 messagebox.showerror("Cannot load opponent", str(exc))
                 self.opponent_spec = "perfect"
@@ -213,7 +311,9 @@ class TicTacToeGUI:
         self.after_move()
 
     def on_motion(self, event) -> None:
-        self._set_hover(self.cell_at(event.x, event.y) if self.human_to_move() else None)
+        self._set_hover(
+            self.cell_at(event.x, event.y) if self.human_to_move() else None
+        )
 
     def _set_hover(self, idx) -> None:
         if idx is not None and self.board.cells[idx] != EMPTY:
@@ -265,7 +365,10 @@ class TicTacToeGUI:
                 if item[0] == "move":
                     _, move, why = item
                     self.thinking = False
-                    if not self.board.is_terminal and self.board.cells[move] == EMPTY:
+                    if (
+                        not self.board.is_terminal
+                        and self.board.cells[move] == EMPTY
+                    ):
                         self.board.push(move)
                     self.detail.configure(text=why or "")
                     self.draw()
@@ -320,29 +423,62 @@ class TicTacToeGUI:
                 fill = "#1E2A20"
             elif i == self.hover and b.cells[i] == EMPTY:
                 fill = CELL_HOVER
-            cv.create_rectangle(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill=fill, outline=GRID, width=1)
+            cv.create_rectangle(
+                x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill=fill, outline=GRID, width=1
+            )
 
             v = b.cells[i]
             if v == X:
                 col = WIN_COLOR if i in win else X_COLOR
-                cv.create_line(x0 + pad, y0 + pad, x1 - pad, y1 - pad,
-                               fill=col, width=lw, capstyle="round")
-                cv.create_line(x1 - pad, y0 + pad, x0 + pad, y1 - pad,
-                               fill=col, width=lw, capstyle="round")
+                cv.create_line(
+                    x0 + pad,
+                    y0 + pad,
+                    x1 - pad,
+                    y1 - pad,
+                    fill=col,
+                    width=lw,
+                    capstyle="round",
+                )
+                cv.create_line(
+                    x1 - pad,
+                    y0 + pad,
+                    x0 + pad,
+                    y1 - pad,
+                    fill=col,
+                    width=lw,
+                    capstyle="round",
+                )
             elif v == O:
                 col = WIN_COLOR if i in win else O_COLOR
-                cv.create_oval(x0 + pad, y0 + pad, x1 - pad, y1 - pad,
-                               outline=col, width=lw)
+                cv.create_oval(
+                    x0 + pad,
+                    y0 + pad,
+                    x1 - pad,
+                    y1 - pad,
+                    outline=col,
+                    width=lw,
+                )
             elif self.show_solver.get() and i in self.solver_values:
                 tag, colour = self._solver_tag(self.solver_values[i])
-                cv.create_text(x0 + cell * 0.16, y0 + cell * 0.15, text=tag, fill=colour,
-                               anchor="nw", font=("Menlo", max(8, int(cell * 0.13)), "bold"))
+                cv.create_text(
+                    x0 + cell * 0.16,
+                    y0 + cell * 0.15,
+                    text=tag,
+                    fill=colour,
+                    anchor="nw",
+                    font=("Menlo", max(8, int(cell * 0.13)), "bold"),
+                )
 
         if b.last_move is not None and b.last_move not in win:
             r, c = b.coord(b.last_move)
-            cv.create_rectangle(ox + c * cell + 3, oy + r * cell + 3,
-                                ox + (c + 1) * cell - 3, oy + (r + 1) * cell - 3,
-                                outline=MUTED, width=1)
+            cv.create_rectangle(
+                ox + c * cell + 3,
+                oy + r * cell + 3,
+                ox + (c + 1) * cell - 3,
+                oy + (r + 1) * cell - 3,
+                outline=MUTED,
+                width=1,
+            )
         self._update_status()
 
     def _solver_tag(self, result):
@@ -351,7 +487,7 @@ class TicTacToeGUI:
         if abs(result.value) < WIN // 2:
             return ("D", EVEN)
         n = (WIN - abs(result.value) + 1) // 2
-        return (("W%d" % n, GOOD) if result.value > 0 else ("L%d" % n, BAD))
+        return ("W%d" % n, GOOD) if result.value > 0 else ("L%d" % n, BAD)
 
     def _update_status(self) -> None:
         b = self.board
@@ -359,35 +495,55 @@ class TicTacToeGUI:
             if b.winner == DRAW:
                 self.status.configure(text="Drawn.", fg=INK)
             else:
-                who = ("You" if (self.agent is not None and b.winner == self.human_side)
-                       else ("Player %s" % ("X" if b.winner == X else "O")) if self.agent is None
-                       else self.opponent_spec)
+                who = (
+                    "You"
+                    if (self.agent is not None and b.winner == self.human_side)
+                    else ("Player %s" % ("X" if b.winner == X else "O"))
+                    if self.agent is None
+                    else self.opponent_spec
+                )
                 line = "-".join(b.label(i) for i in b.win_line)
-                self.status.configure(text=f"{who} won on {line}.", fg=WIN_COLOR)
+                self.status.configure(
+                    text=f"{who} won on {line}.", fg=WIN_COLOR
+                )
             self.detail.configure(text="%d moves" % b.ply)
             return
         if self.thinking:
-            self.status.configure(text=f"{self.opponent_spec} is thinking…", fg=MUTED)
+            self.status.configure(
+                text=f"{self.opponent_spec} is thinking…", fg=MUTED
+            )
             return
         if self.agent is None:
-            self.status.configure(text="Player %s to move." % ("X" if b.to_move == X else "O"), fg=INK)
+            self.status.configure(
+                text="Player %s to move." % ("X" if b.to_move == X else "O"),
+                fg=INK,
+            )
         else:
-            self.status.configure(text="Your move (%s)." % ("X" if self.human_side == X else "O"),
-                                  fg=INK)
+            self.status.configure(
+                text="Your move (%s)." % ("X" if self.human_side == X else "O"),
+                fg=INK,
+            )
         self.detail.configure(text="%dx%d, %d in a row" % (b.rows, b.cols, b.k))
 
 
 def main(argv=None) -> int:
-    p = argparse.ArgumentParser(prog="tictactoe.gui", description="Play tic-tac-toe in a window.")
+    p = argparse.ArgumentParser(
+        prog="tictactoe.gui", description="Play tic-tac-toe in a window."
+    )
     p.add_argument("--size", type=int, default=3, metavar="N")
     p.add_argument("--rows", type=int, default=None)
     p.add_argument("--cols", type=int, default=None)
     p.add_argument("-k", "--k", type=int, default=None)
-    p.add_argument("--opponent", default="perfect",
-                   help="agent spec: random, greedy, perfect, negamax:D, time:S, "
-                        "noisy:P:AGENT, human, or module:attribute")
+    p.add_argument(
+        "--opponent",
+        default="perfect",
+        help="agent spec: random, greedy, perfect, negamax:D, time:S, "
+        "noisy:P:AGENT, human, or module:attribute",
+    )
     p.add_argument("--side", default="X", choices=["X", "O", "x", "o"])
-    p.add_argument("--solver", action="store_true", help="start with the solver overlay on")
+    p.add_argument(
+        "--solver", action="store_true", help="start with the solver overlay on"
+    )
     p.add_argument("--seed", type=int, default=None)
     args = p.parse_args(argv)
 
@@ -396,9 +552,16 @@ def main(argv=None) -> int:
     k = args.k if args.k is not None else min(rows, cols)
 
     root = tk.Tk()
-    TicTacToeGUI(root, rows, cols, k, args.opponent,
-                 X if args.side.upper() == "X" else O,
-                 args.solver or (rows * cols <= 9), args.seed)
+    TicTacToeGUI(
+        root,
+        rows,
+        cols,
+        k,
+        args.opponent,
+        X if args.side.upper() == "X" else O,
+        args.solver or (rows * cols <= 9),
+        args.seed,
+    )
     root.mainloop()
     return 0
 

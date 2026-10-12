@@ -23,10 +23,10 @@ EXACT, LOWER, UPPER = 0, 1, 2
 
 class SearchResult(NamedTuple):
     move: int | None
-    value: float          # from the perspective of the side to move
+    value: float  # from the perspective of the side to move
     depth: int
     nodes: int
-    exact: bool           # True if the value is the game-theoretic result
+    exact: bool  # True if the value is the game-theoretic result
     seconds: float
 
     @property
@@ -54,9 +54,12 @@ def _ordering_bias(rows: int, cols: int) -> list[float]:
 class Negamax:
     """Reusable searcher. One instance keeps its transposition table warm."""
 
-    def __init__(self, max_depth: int | None = None,
-                 time_limit: float | None = None,
-                 tt_size: int = 1 << 20):
+    def __init__(
+        self,
+        max_depth: int | None = None,
+        time_limit: float | None = None,
+        tt_size: int = 1 << 20,
+    ):
         self.max_depth = max_depth
         self.time_limit = time_limit
         self.tt_size = tt_size
@@ -74,7 +77,9 @@ class Negamax:
     def search(self, board: Board) -> SearchResult:
         started = time.perf_counter()
         self.nodes = 0
-        self._deadline = None if self.time_limit is None else started + self.time_limit
+        self._deadline = (
+            None if self.time_limit is None else started + self.time_limit
+        )
         # Board.hash ignores k, so entries from other rules would be stale.
         if board.spec != self._tt_spec:
             self._tt.clear()
@@ -84,11 +89,13 @@ class Negamax:
         self._root_ply = board.ply
         self._bias = _ordering_bias(board.rows, board.cols)
         self._windows = windows(board.rows, board.cols, board.k)
-        self._weights = [0.0] + [10.0 ** i for i in range(board.k)]
+        self._weights = [0.0] + [10.0**i for i in range(board.k)]
 
         empties = len(board.legal_moves())
         if empties == 0:
-            return SearchResult(None, 0.0, 0, 0, True, time.perf_counter() - started)
+            return SearchResult(
+                None, 0.0, 0, 0, True, time.perf_counter() - started
+            )
 
         if self.max_depth is None:
             target = min(empties, SOFT_EXACT_LIMIT)
@@ -154,11 +161,13 @@ class Negamax:
             board.pop()
             if value > best_value:
                 best_value, best_move = value, m
-            if value > alpha:
+            if value > alpha:  # noqa: PLR1730 (hot loop; avoids a max() call)
                 alpha = value
         return best_move, best_value, True
 
-    def _negamax(self, board: Board, depth: int, alpha: float, beta: float) -> float:
+    def _negamax(
+        self, board: Board, depth: int, alpha: float, beta: float
+    ) -> float:
         self.nodes += 1
         if self._deadline is not None and (self.nodes & 1023) == 0:
             if time.perf_counter() > self._deadline:
@@ -199,7 +208,7 @@ class Negamax:
                 board.pop()
             if value > best:
                 best, best_move = value, m
-            if value > alpha:
+            if value > alpha:  # noqa: PLR1730 (hot loop; avoids a max() call)
                 alpha = value
             if alpha >= beta:
                 break
@@ -215,7 +224,9 @@ class Negamax:
             self._tt[key] = (depth, flag, stored, best_move)
         return best
 
-    def _ordered(self, board: Board, depth: int, tt_move: int | None = None) -> list[int]:
+    def _ordered(
+        self, board: Board, depth: int, tt_move: int | None = None
+    ) -> list[int]:
         """Immediate wins, then blocks, then stones near the action, then centre."""
         moves = board.legal_moves()
         if not moves:
@@ -233,7 +244,11 @@ class Negamax:
                     if dr == 0 and dc == 0:
                         continue
                     rr, cc = r + dr, c + dc
-                    if 0 <= rr < rows and 0 <= cc < cols and cells[rr * cols + cc] != EMPTY:
+                    if (
+                        0 <= rr < rows
+                        and 0 <= cc < cols
+                        and cells[rr * cols + cc] != EMPTY
+                    ):
                         n += 1
             return n
 
