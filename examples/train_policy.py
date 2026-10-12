@@ -59,6 +59,7 @@ class Policy:
         mask: np.ndarray,
         actions: np.ndarray,
         advantage: np.ndarray,
+        *,
         lr: float,
         entropy: float = 0.01,
         l2: float = 1e-5,
@@ -156,6 +157,7 @@ def train(
     rows: int,
     cols: int,
     k: int,
+    *,
     hidden: int,
     lr: float,
     batch: int,
@@ -191,22 +193,22 @@ def train(
             sd = adv.std()
             if sd > 1e-8:
                 adv /= sd
-            policy.step(X_, M_, A_, adv, lr, entropy)
+            policy.step(X_, M_, A_, adv, lr=lr, entropy=entropy)
             xs, ms, acts, rets = [], [], [], []
             played = 0
 
         if g % max(1, games // 10) == 0:
-            print("  %6d games   win %.2f  draw %.2f" % (g, won / g, drawn / g))
+            print(f"  {g:6d} games   win {won / g:.2f}  draw {drawn / g:.2f}")
     return policy
 
 
 def evaluate(
-    policy: Policy, spec: str, games: int, rows: int, cols: int, k: int
+    policy: Policy, spec: str, games: int, *, rows: int, cols: int, k: int
 ) -> str:
 
     me = PolicyAgent(policy)
     them = agents.load_agent(spec)
-    res = arena.play_match(me, them, games, rows, cols, k)
+    res = arena.play_match(me, them, games, rows=rows, cols=cols, k=k)
     return res.summary("policy", them.name)
 
 
@@ -265,8 +267,8 @@ def main(argv: list[str] | None = None) -> int:
     k = args.k or min(rows, cols)
 
     print(
-        "training a %d-unit policy on %dx%d (k=%d) against %s"
-        % (args.hidden, rows, cols, k, args.opponent)
+        f"training a {args.hidden}-unit policy on {rows}x{cols} (k={k}) "
+        f"against {args.opponent}"
     )
     policy = train(
         args.games,
@@ -274,12 +276,12 @@ def main(argv: list[str] | None = None) -> int:
         rows,
         cols,
         k,
-        args.hidden,
-        args.lr,
-        args.batch,
-        args.seed,
-        not args.no_augment,
-        args.entropy,
+        hidden=args.hidden,
+        lr=args.lr,
+        batch=args.batch,
+        seed=args.seed,
+        augment=not args.no_augment,
+        entropy=args.entropy,
     )
     policy.save(WEIGHTS)
     print(f"saved {WEIGHTS}\n")
@@ -289,9 +291,9 @@ def main(argv: list[str] | None = None) -> int:
                 policy,
                 spec,
                 args.eval_games if spec != "perfect" else 40,
-                rows,
-                cols,
-                k,
+                rows=rows,
+                cols=cols,
+                k=k,
             )
         )
     return 0

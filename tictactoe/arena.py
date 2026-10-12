@@ -53,6 +53,7 @@ def play_game(
     rows: int = 3,
     cols: int | None = None,
     k: int | None = None,
+    *,
     on_move: Callable[[game.Board, int, int], object] | None = None,
 ) -> GameRecord:
     """Plays one game to the end.
@@ -126,24 +127,13 @@ class MatchResult:
         Returns:
             W-D-L overall and per colour, plus the score.
         """
+        x, o = self.as_x, self.as_o
         return (
-            "%s vs %s over %d games: %d-%d-%d (W-D-L), score %.3f\n"
-            "  as X: %d-%d-%d    as O: %d-%d-%d"
-            % (
-                name_a,
-                name_b,
-                self.games,
-                self.wins,
-                self.draws,
-                self.losses,
-                self.score,
-                self.as_x["w"],
-                self.as_x["d"],
-                self.as_x["l"],
-                self.as_o["w"],
-                self.as_o["d"],
-                self.as_o["l"],
-            )
+            f"{name_a} vs {name_b} over {self.games} games: "
+            f"{self.wins}-{self.draws}-{self.losses} (W-D-L), "
+            f"score {self.score:.3f}\n"
+            f"  as X: {x['w']}-{x['d']}-{x['l']}    "
+            f"as O: {o['w']}-{o['d']}-{o['l']}"
         )
 
 
@@ -151,6 +141,7 @@ def play_match(
     agent_a: agents.Agent,
     agent_b: agents.Agent,
     games: int = 100,
+    *,
     rows: int = 3,
     cols: int | None = None,
     k: int | None = None,
@@ -210,6 +201,7 @@ def selfplay(
     rows: int = 3,
     cols: int | None = None,
     k: int | None = None,
+    *,
     seed: int | None = None,
 ) -> Iterator[GameRecord]:
     """Streams games between two independently seeded copies of one agent.

@@ -205,5 +205,79 @@ class TestNoisyAgent(unittest.TestCase):
             self.assertEqual(agent.select(board), 2)
 
 
+class TestLoadAgentBuiltins(unittest.TestCase):
+    """Pins what every built-in spec builds, ahead of splitting load_agent."""
+
+    def test_each_builtin_builds_the_same_agent(self):
+        rng = random.Random(0)
+        cases = [
+            # (spec, class, name, depth, time_limit, epsilon)
+            ("random", agents.RandomAgent, "random", None, None, None),
+            ("  greedy ", agents.GreedyAgent, "greedy", None, None, None),
+            ("perfect", agents.NegamaxAgent, "perfect", None, None, 0.0),
+            ("negamax:4", agents.NegamaxAgent, "negamax:4", 4, None, 0.0),
+            ("time:0.25", agents.NegamaxAgent, "perfect", None, 0.25, 0.0),
+            ("human", agents.HumanAgent, "human", None, None, None),
+            (
+                "noisy:0.5",
+                agents.NegamaxAgent,
+                "noisy:0.5:perfect",
+                None,
+                None,
+                0.5,
+            ),
+            (
+                "noisy:0.20:negamax:3",
+                agents.NegamaxAgent,
+                "noisy:0.20:negamax:3",
+                3,
+                None,
+                0.2,
+            ),
+            (
+                "noisy:0.25:greedy",
+                agents.NoisyAgent,
+                "noisy:0.25:greedy",
+                None,
+                None,
+                0.25,
+            ),
+        ]
+        for spec, cls, name, depth, time_limit, epsilon in cases:
+            with self.subTest(spec=spec):
+                agent = agents.load_agent(spec, rng)
+                self.assertIs(type(agent), cls)
+                self.assertEqual(agent.name, name)
+                if cls is agents.NegamaxAgent:
+                    self.assertEqual(agent.engine.max_depth, depth)
+                    self.assertEqual(agent.engine.time_limit, time_limit)
+                    self.assertIs(agent.rng, rng)
+                if epsilon is not None:
+                    self.assertEqual(agent.epsilon, epsilon)
+                if cls in (agents.RandomAgent, agents.GreedyAgent):
+                    self.assertIs(agent.rng, rng)
+
+    def test_noisy_wrapper_shares_the_rng(self):
+        rng = random.Random(0)
+        agent = agents.load_agent("noisy:0.25:greedy", rng)
+        self.assertIs(agent.rng, rng)
+        self.assertIs(agent.base.rng, rng)
+
+    def test_bad_numeric_tails_raise_value_error(self):
+        for spec in ("negamax:x", "time:", "noisy:x:greedy", "negamax"):
+            with self.subTest(spec=spec), self.assertRaises(ValueError):
+                agents.load_agent(spec)
+
+    def test_unknown_spec_message(self):
+        with self.assertRaises(ValueError) as ctx:
+            agents.load_agent("nonsense")
+        self.assertEqual(
+            str(ctx.exception),
+            "unknown agent 'nonsense' -- expected one of greedy, human, "
+            "perfect, random, negamax:D, time:S, noisy:P:AGENT, or "
+            "module:attribute",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

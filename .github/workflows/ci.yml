@@ -18,10 +18,7 @@ jobs:
           enable-cache: true
       - name: Format (ruff format --check)
         run: uvx ruff@0.16.10 format --check .
-      # Non-blocking until the 98 findings left from before the Google-style
-      # work are cleared; drop continue-on-error once `ruff check .` passes.
-      - name: Lint (ruff check, non-blocking)
-        continue-on-error: true
+      - name: Lint (ruff check)
         run: uvx ruff@0.16.10 check --output-format github .
       - name: Tests (unittest, with the test extra)
         run: |

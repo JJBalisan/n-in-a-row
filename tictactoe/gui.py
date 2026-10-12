@@ -77,6 +77,7 @@ class TicTacToeGUI:
         rows: int,
         cols: int,
         k: int,
+        *,
         opponent_spec: str,
         human_side: int,
         show_solver: bool,
@@ -266,10 +267,10 @@ class TicTacToeGUI:
         wrap.pack(fill="both", expand=True, padx=16, pady=8)
         self.canvas = tk.Canvas(wrap, bg=BG, highlightthickness=0, bd=0)
         self.canvas.pack(fill="both", expand=True)
-        self.canvas.bind("<Configure>", lambda e: self.draw())
+        self.canvas.bind("<Configure>", lambda _e: self.draw())
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<Motion>", self.on_motion)
-        self.canvas.bind("<Leave>", lambda e: self._set_hover(None))
+        self.canvas.bind("<Leave>", lambda _e: self._set_hover(None))
 
     def _build_status(self) -> None:
         bar = tk.Frame(self.root, bg=BG)
@@ -306,7 +307,7 @@ class TicTacToeGUI:
                     if self.opponent_spec == "human"
                     else agents.load_agent(self.opponent_spec, self.rng)
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - shown in a dialog
                 messagebox.showerror("Cannot load opponent", str(exc))
                 self.opponent_spec = "perfect"
                 self.opp_var.set("perfect")
@@ -377,7 +378,7 @@ class TicTacToeGUI:
         try:
             move = self.agent.select(snapshot)
             why = self.agent.explain(snapshot)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - sent to the queue
             self.queue.put(("error", str(exc)))
             return
         # Keep a slow-looking engine from feeling instant and a fast one from
@@ -391,7 +392,7 @@ class TicTacToeGUI:
         snapshot = self.board.copy()
         try:
             values = self.solver_engine.evaluate_moves(snapshot)
-        except Exception:
+        except Exception:  # noqa: BLE001 - the overlay is best-effort
             return
         self.queue.put(("solver", snapshot.hash, values))
 
@@ -527,7 +528,7 @@ class TicTacToeGUI:
         if abs(result.value) < search.WIN // 2:
             return ("D", EVEN)
         n = (search.WIN - abs(result.value) + 1) // 2
-        return ("W%d" % n, GOOD) if result.value > 0 else ("L%d" % n, BAD)
+        return (f"W{int(n)}", GOOD) if result.value > 0 else (f"L{int(n)}", BAD)
 
     def _update_status(self) -> None:
         b = self.board
@@ -546,7 +547,7 @@ class TicTacToeGUI:
                 self.status.configure(
                     text=f"{who} won on {line}.", fg=WIN_COLOR
                 )
-            self.detail.configure(text="%d moves" % b.ply)
+            self.detail.configure(text=f"{b.ply} moves")
             return
         if self.thinking:
             self.status.configure(
@@ -565,7 +566,7 @@ class TicTacToeGUI:
                 % ("X" if self.human_side == game.X else "O"),
                 fg=INK,
             )
-        self.detail.configure(text="%dx%d, %d in a row" % (b.rows, b.cols, b.k))
+        self.detail.configure(text=f"{b.rows}x{b.cols}, {b.k} in a row")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -607,10 +608,10 @@ def main(argv: list[str] | None = None) -> int:
         rows,
         cols,
         k,
-        args.opponent,
-        game.X if args.side.upper() == "X" else game.O,
-        args.solver or (rows * cols <= 9),
-        args.seed,
+        opponent_spec=args.opponent,
+        human_side=game.X if args.side.upper() == "X" else game.O,
+        show_solver=args.solver or (rows * cols <= 9),
+        seed=args.seed,
     )
     root.mainloop()
     return 0

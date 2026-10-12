@@ -11,6 +11,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import random
 import sys
 import time
@@ -79,14 +80,8 @@ def cmd_play(args: argparse.Namespace) -> int:
     color = _color()
 
     print(
-        "\n%dx%d, %d in a row. You are %s against %s."
-        % (
-            board.rows,
-            board.cols,
-            board.k,
-            game.SYMBOL[human_side],
-            engine.name,
-        )
+        f"\n{board.rows}x{board.cols}, {board.k} in a row. "
+        f"You are {game.SYMBOL[human_side]} against {engine.name}."
     )
     print("Enter a cell like b2. 'undo' takes back, 'quit' leaves.\n")
 
@@ -165,16 +160,16 @@ def cmd_match(args: argparse.Namespace) -> int:
     def progress(done: int, total: int, res: arena.MatchResult) -> None:
         if args.quiet or not _color(sys.stderr):
             return
-        sys.stderr.write("\r  %d/%d  score %.3f " % (done, total, res.score))
+        sys.stderr.write(f"\r  {done}/{total}  score {res.score:.3f} ")
         sys.stderr.flush()
 
     res = arena.play_match(
         a,
         b,
         args.games,
-        rows,
-        cols,
-        k,
+        rows=rows,
+        cols=cols,
+        k=k,
         alternate=not args.no_alternate,
         records=records,
         progress=progress,
@@ -190,7 +185,7 @@ def cmd_match(args: argparse.Namespace) -> int:
     )
     if records is not None:
         _write_records(records, args.out)
-        print("  wrote %d games to %s" % (len(records), args.out))
+        print(f"  wrote {len(records)} games to {args.out}")
     return 0
 
 
@@ -210,8 +205,9 @@ def cmd_selfplay(args: argparse.Namespace) -> int:
     started = time.perf_counter()
     counts = {game.X: 0, game.O: 0, game.DRAW: 0}
     n = 0
-    handle = open(args.out, "w") if args.out else None
-    try:
+    with (
+        open(args.out, "w") if args.out else contextlib.nullcontext()
+    ) as handle:
         for rec in arena.selfplay(
             args.agent, args.games, rows, cols, k, seed=args.seed
         ):
@@ -220,25 +216,18 @@ def cmd_selfplay(args: argparse.Namespace) -> int:
             if handle is not None:
                 handle.write(rec.to_json() + "\n")
             if not args.quiet and n % 500 == 0 and _color(sys.stderr):
-                sys.stderr.write("\r  %d/%d games " % (n, args.games))
+                sys.stderr.write(f"\r  {n}/{args.games} games ")
                 sys.stderr.flush()
-    finally:
-        if handle is not None:
-            handle.close()
     if not args.quiet and _color(sys.stderr):
         sys.stderr.write("\r" + " " * 30 + "\r")
     elapsed = time.perf_counter() - started
     print(
-        "%d games of %s in %.2fs (%.0f games/s)"
-        % (n, args.agent, elapsed, n / max(1e-9, elapsed))
+        f"{n} games of {args.agent} in {elapsed:.2f}s "
+        f"({n / max(1e-9, elapsed):.0f} games/s)"
     )
     print(
-        "  X %d   O %d   drawn %d"
-        % (
-            counts.get(game.X, 0),
-            counts.get(game.O, 0),
-            counts.get(game.DRAW, 0),
-        )
+        f"  X {counts.get(game.X, 0)}   O {counts.get(game.O, 0)}   "
+        f"drawn {counts.get(game.DRAW, 0)}"
     )
     if args.out:
         print(
@@ -285,13 +274,10 @@ def cmd_solve(args: argparse.Namespace) -> int:
             "" if result.exact else "  (horizon-limited estimate)",
         )
     )
+    best = board.label(result.move) if result.move is not None else "-"
     print(
-        "  best %s   %d nodes   %.2fs"
-        % (
-            board.label(result.move) if result.move is not None else "-",
-            engine.nodes,
-            time.perf_counter() - started,
-        )
+        f"  best {best}   {engine.nodes} nodes   "
+        f"{time.perf_counter() - started:.2f}s"
     )
     print()
     width = max(len(board.label(m)) for m in per_move) if per_move else 4
@@ -314,7 +300,7 @@ def cmd_bench(args: argparse.Namespace) -> int:
         0.
     """
     rows, cols, k = _shape(args)
-    print("board %dx%d, %d in a row" % (rows, cols, k))
+    print(f"board {rows}x{cols}, {k} in a row")
 
     t = time.perf_counter()
     plies = 0
@@ -326,8 +312,8 @@ def cmd_bench(args: argparse.Namespace) -> int:
             plies += 1
     dt = time.perf_counter() - t
     print(
-        "  engine:   %d random games, %d moves in %.2fs -> %.0f moves/s"
-        % (args.games, plies, dt, plies / max(1e-9, dt))
+        f"  engine:   {args.games} random games, {plies} moves in "
+        f"{dt:.2f}s -> {plies / max(1e-9, dt):.0f} moves/s"
     )
 
     engine = search.Negamax(max_depth=args.depth)
@@ -336,8 +322,8 @@ def cmd_bench(args: argparse.Namespace) -> int:
     r = engine.search(b)
     dt = time.perf_counter() - t
     print(
-        "  search:   depth %d from the empty board, %d nodes in %.2fs"
-        " -> %.0f nodes/s" % (r.depth, r.nodes, dt, r.nodes / max(1e-9, dt))
+        f"  search:   depth {r.depth} from the empty board, {r.nodes} nodes "
+        f"in {dt:.2f}s -> {r.nodes / max(1e-9, dt):.0f} nodes/s"
     )
     print(
         "            {}{}".format(
@@ -364,8 +350,8 @@ def cmd_bench(args: argparse.Namespace) -> int:
             moves += env.n
         dt = time.perf_counter() - t
         print(
-            "  batchenv: %d envs x %d steps = %d moves in %.2fs -> %.0f moves/s"
-            % (args.batch, args.steps, moves, dt, moves / max(1e-9, dt))
+            f"  batchenv: {args.batch} envs x {args.steps} steps = {moves} "
+            f"moves in {dt:.2f}s -> {moves / max(1e-9, dt):.0f} moves/s"
         )
     except ImportError:
         print("  batchenv: skipped (numpy not installed)")

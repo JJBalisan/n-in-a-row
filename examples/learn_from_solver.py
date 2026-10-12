@@ -83,7 +83,7 @@ def label(
             ps.append(p_t)
             vs.append(value)
         if n % 500 == 0:
-            print("  labelled %d/%d positions" % (n, len(positions)))
+            print(f"  labelled {n}/{len(positions)} positions")
     return (
         np.asarray(xs, np.float64),
         np.asarray(ms, bool),
@@ -97,6 +97,7 @@ def fit(
     X: np.ndarray,
     M: np.ndarray,
     P: np.ndarray,
+    *,
     epochs: int,
     batch: int,
     lr: float,
@@ -127,7 +128,7 @@ def fit(
             policy.b2 += lr * db2
             policy.W1 += lr * (x.T @ dh)
             policy.b1 += lr * dh.sum(0)
-        print("  epoch %2d  cross-entropy %.4f" % (epoch, loss_sum / n))
+        print(f"  epoch {epoch:2d}  cross-entropy {loss_sum / n:.4f}")
     return policy
 
 
@@ -173,26 +174,33 @@ def main(argv: list[str] | None = None) -> int:
     k = args.k or min(rows, cols)
 
     print(
-        "gathering positions from %d random games on %dx%d (k=%d)"
-        % (args.walks, rows, cols, k)
+        f"gathering positions from {args.walks} random games on "
+        f"{rows}x{cols} (k={k})"
     )
     positions = collect_positions(rows, cols, k, args.walks, args.seed)
-    print("  %d distinct positions\n" % len(positions))
+    print(f"  {len(positions)} distinct positions\n")
 
-    print(
-        "labelling with the %s engine"
-        % ("exact" if args.depth is None else "depth-%d" % args.depth)
-    )
+    engine_name = "exact" if args.depth is None else f"depth-{args.depth}"
+    print(f"labelling with the {engine_name} engine")
     X, M, P, _V = label(positions, args.depth, not args.no_augment)
     print(
-        "  %d training examples (%s augmentation)\n"
-        % (len(X), "no" if args.no_augment else "8x")
+        f"  {len(X)} training examples "
+        f"({'no' if args.no_augment else '8x'} augmentation)\n"
     )
 
     rng = np.random.default_rng(args.seed)
     policy = train_policy.Policy(X.shape[1], args.hidden, rows * cols, rng)
     print("fitting")
-    fit(policy, X, M, P, args.epochs, args.batch, args.lr, args.seed)
+    fit(
+        policy,
+        X,
+        M,
+        P,
+        epochs=args.epochs,
+        batch=args.batch,
+        lr=args.lr,
+        seed=args.seed,
+    )
     policy.save(WEIGHTS)
     print(f"saved {WEIGHTS}\n")
 
@@ -205,9 +213,9 @@ def main(argv: list[str] | None = None) -> int:
             else max(40, args.eval_games // 4)
         )
         print(
-            arena.play_match(me, them, games, rows, cols, k).summary(
-                "distilled", them.name
-            )
+            arena.play_match(
+                me, them, games, rows=rows, cols=cols, k=k
+            ).summary("distilled", them.name)
         )
     return 0
 
