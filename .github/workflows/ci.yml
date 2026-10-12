@@ -1,0 +1,29 @@
+# The unittest suite on every push and PR, with the test extra (NumPy).
+# GitHub sets CI=true, so the env tests fail instead of skipping if NumPy is
+# ever missing here. Ported from .gitlab-ci.yml when the repo moved to GitHub
+# (12 Oct 2026); based on JJBalisan/dev-toolchain's template.
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      # setup-uv v10.3.0, pinned by commit: it publishes no moving major tag.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          enable-cache: true
+      - name: Format (ruff format --check)
+        run: uvx ruff@0.16.10 format --check .
+      # Non-blocking until the 98 findings left from before the Google-style
+      # work are cleared; drop continue-on-error once `ruff check .` passes.
+      - name: Lint (ruff check, non-blocking)
+        continue-on-error: true
+        run: uvx ruff@0.16.10 check --output-format github .
+      - name: Tests (unittest, with the test extra)
+        run: |
+          uv sync --locked --extra test --python 3.12
+          uv run --python 3.12 python -m unittest discover -s tests -v
