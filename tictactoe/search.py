@@ -279,7 +279,7 @@ class Negamax:
     def _ordered(
         self, board: game.Board, depth: int, tt_move: int | None = None
     ) -> list[int]:
-        """Immediate wins, then blocks, then stones near the action, then centre."""
+        """Sorts legal moves: wins, blocks, cells near stones, then central."""
         moves = board.legal_moves()
         if not moves:
             return moves

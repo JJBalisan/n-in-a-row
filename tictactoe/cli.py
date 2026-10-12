@@ -184,7 +184,9 @@ def cmd_match(args: argparse.Namespace) -> int:
 
     print(res.summary(a.name, b.name))
     print(
-        f"  {time.perf_counter() - started:.2f}s ({args.games / max(1e-9, time.perf_counter() - started):.1f} games/s)"
+        f"  {time.perf_counter() - started:.2f}s "
+        f"({args.games / max(1e-9, time.perf_counter() - started):.1f}"
+        " games/s)"
     )
     if records is not None:
         _write_records(records, args.out)
@@ -240,7 +242,8 @@ def cmd_selfplay(args: argparse.Namespace) -> int:
     )
     if args.out:
         print(
-            f"  wrote {args.out} -- one JSON game per line; tictactoe.replay() turns each into"
+            f"  wrote {args.out} -- one JSON game per line; "
+            "tictactoe.replay() turns each into"
             " (board, move, value) training triples"
         )
     return 0
@@ -333,8 +336,8 @@ def cmd_bench(args: argparse.Namespace) -> int:
     r = engine.search(b)
     dt = time.perf_counter() - t
     print(
-        "  search:   depth %d from the empty board, %d nodes in %.2fs -> %.0f nodes/s"
-        % (r.depth, r.nodes, dt, r.nodes / max(1e-9, dt))
+        "  search:   depth %d from the empty board, %d nodes in %.2fs"
+        " -> %.0f nodes/s" % (r.depth, r.nodes, dt, r.nodes / max(1e-9, dt))
     )
     print(
         "            {}{}".format(
@@ -380,7 +383,9 @@ def build_parser() -> argparse.ArgumentParser:
     """
     p = argparse.ArgumentParser(
         prog="tictactoe",
-        description="Generalised tic-tac-toe: play it, search it, or train against it.",
+        description=(
+            "Generalised tic-tac-toe: play it, search it, or train against it."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""agent specs:
   random                uniform over legal moves

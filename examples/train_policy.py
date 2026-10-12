@@ -1,11 +1,12 @@
-"""A worked example: train a policy network against the engine, then plug it back in.
+r"""A worked example: train a policy network against the engine, then plug it back in.
 
 Deliberately NumPy-only so it runs with no install. It is a plain REINFORCE
 policy gradient -- not a strong method, just the shortest honest path from
 "empty board" to "an agent the CLI and the GUI will play against".
 
     python3 examples/train_policy.py --games 40000 --opponent greedy
-    python3 -m tictactoe match --a examples.train_policy:agent --b greedy --games 400
+    python3 -m tictactoe match --a examples.train_policy:agent \
+        --b greedy --games 400
     python3 -m tictactoe.gui --opponent examples.train_policy:agent
 
 The two things worth copying into a real PyTorch setup:
@@ -13,7 +14,7 @@ The two things worth copying into a real PyTorch setup:
 * mask the illegal moves before the softmax (``obs`` and ``mask`` come straight
   from :mod:`tictactoe.env`), and
 * train on the canonical observation, so one network plays both colours.
-"""
+"""  # noqa: E501 (the long first line doubles as the --help description)
 
 from __future__ import annotations
 
@@ -210,7 +211,7 @@ def evaluate(
 
 
 class PolicyAgent(agents.Agent):
-    """The trained net, wearing the Agent interface the rest of the code expects."""
+    """The trained net, wearing the Agent interface everything else expects."""
 
     name = "policy"
 
@@ -235,7 +236,8 @@ def agent() -> PolicyAgent:
     """Entry point for ``--opponent examples.train_policy:agent``."""
     if not os.path.exists(WEIGHTS):
         raise FileNotFoundError(
-            f"no trained weights at {WEIGHTS} -- run: python3 examples/train_policy.py"
+            f"no trained weights at {WEIGHTS} -- run: "
+            "python3 examples/train_policy.py"
         )
     return PolicyAgent(Policy.load(WEIGHTS))
 

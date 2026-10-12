@@ -1,4 +1,4 @@
-"""Running games: one at a time, in matches, or in bulk to make training data."""
+"""Running games: one at a time, in matches, or in bulk as training data."""
 
 from __future__ import annotations
 

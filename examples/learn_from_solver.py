@@ -1,4 +1,4 @@
-"""Distil the search engine into a network: supervised, fast, and it converges.
+r"""Distil the search engine into a network: supervised, fast, and it converges.
 
 The engine can label any small position exactly, so instead of waiting for a
 policy gradient to stumble onto good play we ask the solver what the right
@@ -7,7 +7,8 @@ to anything) in well under a minute, which makes it the better template for
 your own network: swap the NumPy MLP for a torch module and keep the pipeline.
 
     python3 examples/learn_from_solver.py --size 3
-    python3 -m tictactoe match --a examples.learn_from_solver:agent --b perfect --games 100
+    python3 -m tictactoe match --a examples.learn_from_solver:agent \
+        --b perfect --games 100
     python3 -m tictactoe.gui --opponent examples.learn_from_solver:agent
 
 For boards too big to solve exactly, pass ``--depth 6``: the labels become the
@@ -101,7 +102,7 @@ def fit(
     lr: float,
     seed: int,
 ) -> train_policy.Policy:
-    """Plain masked-softmax cross-entropy against the solver's move distribution."""
+    """Fits the policy by masked-softmax cross-entropy on the solver's moves."""
     rng = np.random.default_rng(seed)
     n = len(X)
     for epoch in range(1, epochs + 1):
@@ -134,7 +135,8 @@ def agent() -> train_policy.PolicyAgent:
     """Entry point for ``--opponent examples.learn_from_solver:agent``."""
     if not os.path.exists(WEIGHTS):
         raise FileNotFoundError(
-            f"no trained weights at {WEIGHTS} -- run: python3 examples/learn_from_solver.py"
+            f"no trained weights at {WEIGHTS} -- run: "
+            "python3 examples/learn_from_solver.py"
         )
     return train_policy.PolicyAgent(train_policy.Policy.load(WEIGHTS))
 
