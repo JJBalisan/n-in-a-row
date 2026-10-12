@@ -197,9 +197,9 @@ CI=1 python3 -m unittest discover -s tests       # what CI runs
 The `TestEnv` cases need NumPy. Locally they skip when it is missing; when the
 `CI` environment variable is set (GitLab and GitHub set `CI=true`) a missing
 NumPy fails them instead, so a green pipeline always means `env.py` was tested.
-The `test` extra in `pyproject.toml` installs it. `.gitlab-ci.yml` runs one job:
-install with the test extra, then the suite. GitLab runs zero jobs until the
-account is identity-verified.
+The `test` extra in `pyproject.toml` installs it. GitHub Actions
+(`.github/workflows/ci.yml`) checks formatting, reports ruff findings
+without failing yet, then installs the test extra and runs the suite.
 
 Tests marked `@unittest.expectedFailure` pin known, not-yet-fixed defects (their
 docstrings say which); the run stays green while they fail and goes red once a
