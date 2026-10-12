@@ -25,7 +25,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tictactoe import agents, arena, env as rl_env
+from tictactoe import agents, arena, env as rl_env, game
 
 WEIGHTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "policy.npz")
 
@@ -35,17 +35,17 @@ class Policy:
 
     def __init__(
         self, n_in: int, n_hidden: int, n_out: int, rng: np.random.Generator
-    ):
+    ) -> None:
         self.W1 = rng.normal(0, np.sqrt(2.0 / n_in), (n_in, n_hidden))
         self.b1 = np.zeros(n_hidden)
         self.W2 = rng.normal(0, np.sqrt(1.0 / n_hidden), (n_hidden, n_out))
         self.b2 = np.zeros(n_out)
 
-    def logits(self, x):
+    def logits(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         h = np.tanh(x @ self.W1 + self.b1)
         return h, h @ self.W2 + self.b2
 
-    def probs(self, x, mask):
+    def probs(self, x: np.ndarray, mask: np.ndarray) -> np.ndarray:
         _, z = self.logits(x)
         z = np.where(mask, z, -1e9)
         z -= z.max(axis=-1, keepdims=True)
@@ -54,14 +54,14 @@ class Policy:
 
     def step(
         self,
-        x,
-        mask,
-        actions,
-        advantage,
+        x: np.ndarray,
+        mask: np.ndarray,
+        actions: np.ndarray,
+        advantage: np.ndarray,
         lr: float,
         entropy: float = 0.01,
         l2: float = 1e-5,
-    ):
+    ) -> None:
         h, z = self.logits(x)
         z = np.where(mask, z, -1e9)
         z -= z.max(axis=-1, keepdims=True)
@@ -108,7 +108,7 @@ def rollout(
     env: rl_env.TicTacToeEnv,
     rng: np.random.Generator,
     augment: bool,
-):
+) -> tuple[list[np.ndarray], list[np.ndarray], list[int], float]:
     """One game. Returns (observations, masks, actions, final reward)."""
     obs = env.reset(swap_sides=bool(rng.integers(2)))
     xs, ms, acts = [], [], []
@@ -127,7 +127,12 @@ def rollout(
     return xs, ms, acts, reward
 
 
-def _augment(xs, ms, acts, env):
+def _augment(
+    xs: list[np.ndarray],
+    ms: list[np.ndarray],
+    acts: list[int],
+    env: rl_env.TicTacToeEnv,
+) -> tuple[list[np.ndarray], list[np.ndarray], list[int]]:
     """Reflect and rotate every state. Eight boards for the price of one."""
     shape = env.observation_shape
     out_x, out_m, out_a = [], [], []
@@ -209,12 +214,14 @@ class PolicyAgent(agents.Agent):
 
     name = "policy"
 
-    def __init__(self, policy: Policy, greedy: bool = True, seed: int = 0):
+    def __init__(
+        self, policy: Policy, greedy: bool = True, seed: int = 0
+    ) -> None:
         self.policy = policy
         self.greedy = greedy
         self.rng = np.random.default_rng(seed)
 
-    def select(self, board) -> int:
+    def select(self, board: game.Board) -> int:
 
         x = rl_env.encode(board).reshape(1, -1).astype(np.float64)
         m = rl_env.legal_mask(board)[None, :]
@@ -233,7 +240,7 @@ def agent() -> PolicyAgent:
     return PolicyAgent(Policy.load(WEIGHTS))
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--games", type=int, default=30000)
     p.add_argument("--opponent", default="random")

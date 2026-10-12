@@ -1,10 +1,11 @@
 """Command line front end.
 
-python3 -m tictactoe play --size 5 --k 4 --opponent negamax:5
-python3 -m tictactoe match --a mynet:agent --b greedy --games 400
-python3 -m tictactoe selfplay --games 20000 --out data.jsonl
-python3 -m tictactoe solve --size 3
-python3 -m tictactoe bench --size 4 --k 4
+Example:
+    python3 -m tictactoe play --size 5 --k 4 --opponent negamax:5
+    python3 -m tictactoe match --a mynet:agent --b greedy --games 400
+    python3 -m tictactoe selfplay --games 20000 --out data.jsonl
+    python3 -m tictactoe solve --size 3
+    python3 -m tictactoe bench --size 4 --k 4
 """
 
 from __future__ import annotations
@@ -13,11 +14,14 @@ import argparse
 import random
 import sys
 import time
+from collections.abc import Iterable
+from typing import TextIO
 
 from tictactoe import agents, arena, game, search
 
 
 def _shape_args(p: argparse.ArgumentParser) -> None:
+    """Adds --size, --rows, --cols, -k and --seed to a subcommand."""
     p.add_argument(
         "--size",
         type=int,
@@ -38,7 +42,8 @@ def _shape_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--seed", type=int, default=None)
 
 
-def _shape(args) -> tuple:
+def _shape(args: argparse.Namespace) -> tuple:
+    """Resolves (rows, cols, k): --rows/--cols beat --size; k may be None."""
     rows = args.rows if args.rows is not None else args.size
     cols = (
         args.cols
@@ -48,14 +53,23 @@ def _shape(args) -> tuple:
     return rows, cols, args.k
 
 
-def _color(stream=sys.stdout) -> bool:
+def _color(stream: TextIO = sys.stdout) -> bool:
+    """Whether to use ANSI colour and progress output on ``stream``."""
     return hasattr(stream, "isatty") and stream.isatty()
 
 
 # ---------------------------------------------------------------- play
 
 
-def cmd_play(args) -> int:
+def cmd_play(args: argparse.Namespace) -> int:
+    """Plays a game against an agent in the terminal.
+
+    Args:
+        args: Parsed ``play`` arguments.
+
+    Returns:
+        0 when the game ends or the player quits.
+    """
     rows, cols, k = _shape(args)
     rng = random.Random(args.seed)
     board = game.Board(rows, cols, k)
@@ -131,7 +145,15 @@ def cmd_play(args) -> int:
 # --------------------------------------------------------------- match
 
 
-def cmd_match(args) -> int:
+def cmd_match(args: argparse.Namespace) -> int:
+    """Pits two agents against each other and prints the totals.
+
+    Args:
+        args: Parsed ``match`` arguments.
+
+    Returns:
+        0.
+    """
     rows, cols, k = _shape(args)
     rng = random.Random(args.seed)
     a = agents.load_agent(args.a, random.Random(rng.getrandbits(32)))
@@ -140,7 +162,7 @@ def cmd_match(args) -> int:
 
     started = time.perf_counter()
 
-    def progress(done, total, res):
+    def progress(done: int, total: int, res: arena.MatchResult) -> None:
         if args.quiet or not _color(sys.stderr):
             return
         sys.stderr.write("\r  %d/%d  score %.3f " % (done, total, res.score))
@@ -173,7 +195,15 @@ def cmd_match(args) -> int:
 # ------------------------------------------------------------ selfplay
 
 
-def cmd_selfplay(args) -> int:
+def cmd_selfplay(args: argparse.Namespace) -> int:
+    """Generates self-play games, optionally as JSONL training data.
+
+    Args:
+        args: Parsed ``selfplay`` arguments.
+
+    Returns:
+        0.
+    """
     rows, cols, k = _shape(args)
     started = time.perf_counter()
     counts = {game.X: 0, game.O: 0, game.DRAW: 0}
@@ -216,7 +246,8 @@ def cmd_selfplay(args) -> int:
     return 0
 
 
-def _write_records(records, path: str) -> None:
+def _write_records(records: Iterable[arena.GameRecord], path: str) -> None:
+    """Writes one JSON game per line to ``path``, replacing the file."""
     with open(path, "w") as fh:
         for rec in records:
             fh.write(rec.to_json() + "\n")
@@ -225,7 +256,15 @@ def _write_records(records, path: str) -> None:
 # --------------------------------------------------------------- solve
 
 
-def cmd_solve(args) -> int:
+def cmd_solve(args: argparse.Namespace) -> int:
+    """Evaluates a position and every legal reply.
+
+    Args:
+        args: Parsed ``solve`` arguments.
+
+    Returns:
+        0.
+    """
     rows, cols, k = _shape(args)
     board = game.Board(rows, cols, k)
     for token in args.moves:
@@ -262,7 +301,15 @@ def cmd_solve(args) -> int:
 # --------------------------------------------------------------- bench
 
 
-def cmd_bench(args) -> int:
+def cmd_bench(args: argparse.Namespace) -> int:
+    """Measures engine, search and (with NumPy) batch-env throughput.
+
+    Args:
+        args: Parsed ``bench`` arguments.
+
+    Returns:
+        0.
+    """
     rows, cols, k = _shape(args)
     print("board %dx%d, %d in a row" % (rows, cols, k))
 
@@ -326,6 +373,11 @@ def cmd_bench(args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Builds the parser; each subcommand stores its handler as ``func``.
+
+    Returns:
+        The top-level parser.
+    """
     p = argparse.ArgumentParser(
         prog="tictactoe",
         description="Generalised tic-tac-toe: play it, search it, or train against it.",
@@ -407,6 +459,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Runs the command line.
+
+    Args:
+        argv: Arguments without the program name; sys.argv[1:] if None.
+
+    Returns:
+        The exit code: 0 on success, 2 for an invalid move or bad
+        arguments (argparse raises SystemExit itself), 130 on Ctrl-C.
+    """
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)

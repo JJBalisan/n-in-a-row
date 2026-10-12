@@ -22,6 +22,18 @@ EXACT, LOWER, UPPER = 0, 1, 2
 
 
 class SearchResult(NamedTuple):
+    """What a search found.
+
+    Attributes:
+        move: The best move found, or None if there was none to make.
+        value: The score from the side to move's point of view: near +WIN
+            for a forced win, near -WIN for a forced loss, else heuristic.
+        depth: The deepest iteration that completed.
+        nodes: Positions visited.
+        exact: True if ``value`` is the game-theoretic result.
+        seconds: Wall-clock time spent.
+    """
+
     move: int | None
     value: float  # from the perspective of the side to move
     depth: int
@@ -31,7 +43,10 @@ class SearchResult(NamedTuple):
 
     @property
     def outcome(self) -> str:
-        """'win in N', 'draw', 'loss in N' -- N counted in the mover's own moves."""
+        """'win in N', 'draw' or 'loss in N', else 'eval +X.XX' if inexact.
+
+        N counts the mover's own moves.
+        """
         if not self.exact:
             return "eval %+.2f" % (self.value / 100.0)
         if abs(self.value) < WIN // 2:
@@ -52,14 +67,30 @@ def _ordering_bias(rows: int, cols: int) -> list[float]:
 
 
 class Negamax:
-    """Reusable searcher. One instance keeps its transposition table warm."""
+    """Reusable searcher. One instance keeps its transposition table warm.
+
+    Attributes:
+        max_depth: Iterative-deepening cap, or None to search up to the
+            soft exact limit.
+        time_limit: Seconds per search, or None for no limit.
+        tt_size: The most transposition-table entries kept.
+        nodes: Positions visited by the most recent search.
+    """
 
     def __init__(
         self,
         max_depth: int | None = None,
         time_limit: float | None = None,
         tt_size: int = 1 << 20,
-    ):
+    ) -> None:
+        """Creates a searcher with an empty transposition table.
+
+        Args:
+            max_depth: Depth cap in plies; None searches every remaining
+                move, up to SOFT_EXACT_LIMIT.
+            time_limit: Seconds per search; None means no limit.
+            tt_size: The most transposition-table entries to keep.
+        """
         self.max_depth = max_depth
         self.time_limit = time_limit
         self.tt_size = tt_size
@@ -75,6 +106,17 @@ class Negamax:
     # ---- public ---------------------------------------------------------
 
     def search(self, board: game.Board) -> SearchResult:
+        """Finds the best move for the side to move by iterative deepening.
+
+        The board is searched in place and left as it was found.
+
+        Args:
+            board: The position to search.
+
+        Returns:
+            The result of the deepest iteration, or the best move of a
+            partial one when the time limit cut it short.
+        """
         started = time.perf_counter()
         self.nodes = 0
         self._deadline = (
@@ -131,7 +173,15 @@ class Negamax:
         )
 
     def evaluate_moves(self, board: game.Board) -> dict[int, SearchResult]:
-        """Search every legal reply. Feeds the GUI's 'show the solver' overlay."""
+        """Searches every legal reply; feeds the GUI's solver overlay.
+
+        Args:
+            board: The position to search; left as it was found.
+
+        Returns:
+            A result per legal move, scored from the point of view of the
+            side to move in ``board``.
+        """
         out = {}
         for m in board.legal_moves():
             board.push(m)
@@ -148,7 +198,9 @@ class Negamax:
 
     # ---- internals ------------------------------------------------------
 
-    def _root(self, board: game.Board, depth: int):
+    def _root(
+        self, board: game.Board, depth: int
+    ) -> tuple[int | None, float, bool]:
         alpha, beta = -float("inf"), float("inf")
         best_move, best_value = None, -float("inf")
         for m in self._ordered(board, depth):
@@ -294,7 +346,17 @@ class Negamax:
 
 
 def shift_mate(value: float) -> float:
-    """Move a mate score one ply further away (the reply we just stepped over)."""
+    """Moves a mate score one ply further away.
+
+    Used when a child's score is negated into its parent's, so the reply that
+    was stepped over counts towards the mate distance.
+
+    Args:
+        value: A score; non-mate scores pass through unchanged.
+
+    Returns:
+        The score with any mate distance one ply longer.
+    """
     if value > WIN // 2:
         return value - 1
     if value < -WIN // 2:
@@ -339,10 +401,18 @@ def _mate_from_tt(value: float, plies_from_root: int) -> float:
     return value
 
 
-class _TimeUp(Exception):
-    pass
+class _TimeUp(Exception):  # noqa: N818 (private control-flow signal)
+    """Unwinds a search whose time limit has passed."""
 
 
 def solve(board: game.Board, max_depth: int | None = None) -> SearchResult:
-    """One-shot convenience wrapper."""
+    """Searches one position with a fresh engine.
+
+    Args:
+        board: The position to search.
+        max_depth: Depth cap, or None to solve exactly where feasible.
+
+    Returns:
+        The search result.
+    """
     return Negamax(max_depth=max_depth).search(board)

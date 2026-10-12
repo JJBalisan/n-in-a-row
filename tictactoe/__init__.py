@@ -1,7 +1,10 @@
 """Generalised tic-tac-toe: engine, search, agents, RL environment.
 
-from tictactoe import Board, load_agent, play_game
-board = Board(5, 5, k=4)          # 5x5, four in a row
+The package re-exports the names most callers need.
+
+Example:
+    from tictactoe import Board, load_agent, play_game
+    board = Board(5, 5, k=4)          # 5x5, four in a row
 """
 
 from tictactoe import agents, arena, game, search

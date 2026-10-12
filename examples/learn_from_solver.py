@@ -33,7 +33,9 @@ WEIGHTS = os.path.join(
 )
 
 
-def collect_positions(rows: int, cols: int, k: int, games: int, seed: int):
+def collect_positions(
+    rows: int, cols: int, k: int, games: int, seed: int
+) -> list[game.Board]:
     """Walk random games and keep every distinct position seen along the way."""
     rng = random.Random(seed)
     seen = {}
@@ -46,7 +48,9 @@ def collect_positions(rows: int, cols: int, k: int, games: int, seed: int):
     return list(seen.values())
 
 
-def label(positions, depth, augment: bool):
+def label(
+    positions: list[game.Board], depth: int | None, augment: bool
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Ask the engine for the optimal replies, as a probability over cells."""
     engine = search.Negamax(max_depth=depth)
     xs, ms, ps, vs = [], [], [], []
@@ -89,14 +93,14 @@ def label(positions, depth, augment: bool):
 
 def fit(
     policy: train_policy.Policy,
-    X,
-    M,
-    P,
+    X: np.ndarray,
+    M: np.ndarray,
+    P: np.ndarray,
     epochs: int,
     batch: int,
     lr: float,
     seed: int,
-):
+) -> train_policy.Policy:
     """Plain masked-softmax cross-entropy against the solver's move distribution."""
     rng = np.random.default_rng(seed)
     n = len(X)
@@ -135,7 +139,7 @@ def agent() -> train_policy.PolicyAgent:
     return train_policy.PolicyAgent(train_policy.Policy.load(WEIGHTS))
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--size", type=int, default=3)
     p.add_argument("--rows", type=int, default=None)

@@ -63,5 +63,6 @@ max-statements = 50      # ~ pyguide 3.18 "about 40 lines"
 # E402: sys.path is set up before the package imports.
 # PLC0415: NumPy and tkinter tests import lazily so they can skip.
 "tests/**" = ["D", "ANN", "S101", "PLR", "ARG", "E402", "PLC0415"]
-"examples/**" = ["T20", "D", "E402"]
+# N803/N806: the NumPy code keeps matrix notation (X, W1, dW2, H).
+"examples/**" = ["T20", "D", "E402", "N803", "N806"]
 "tictactoe/cli.py" = ["T20"]   # printing is the command line's job

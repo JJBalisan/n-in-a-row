@@ -1,7 +1,7 @@
 """Generalised n-in-a-row engine (tic-tac-toe on an arbitrary board).
 
 Pure standard library on purpose: the CLI and the GUI import only this module
-tree, so they run on any Python 3.8+ with nothing installed.  NumPy appears
+tree, so they run on any Python 3.9+ with nothing installed.  NumPy appears
 exclusively in :mod:`tictactoe.env`, the reinforcement-learning layer.
 """
 
@@ -28,15 +28,33 @@ _WINDOW_CACHE = {}
 
 
 def opponent(player: int) -> int:
+    """Returns the other player.
+
+    Args:
+        player: X or O.
+
+    Returns:
+        O for X, and X for anything else.
+    """
     return O if player == X else X
 
 
-class InvalidMove(ValueError):
-    """Raised when a move is off the board, onto a taken cell, or after the end."""
+class InvalidMove(ValueError):  # noqa: N818 (public name)
+    """Raised for a move off the board, onto a taken cell, or after the end."""
 
 
-def _zobrist(rows: int, cols: int):
-    """Deterministic per-shape Zobrist table, so hashes match across processes."""
+def _zobrist(rows: int, cols: int) -> tuple[tuple[int, int, int], ...]:
+    """Returns the deterministic per-shape Zobrist table.
+
+    Seeded from the shape, so hashes match across processes.
+
+    Args:
+        rows: Board height.
+        cols: Board width.
+
+    Returns:
+        One (0, x_key, o_key) triple per cell, indexed by player.
+    """
     key = (rows, cols)
     table = _ZOBRIST_CACHE.get(key)
     if table is None:
@@ -53,9 +71,17 @@ _SIDE_HASH = 0x9E3779B97F4A7C15
 
 
 def windows(rows: int, cols: int, k: int) -> tuple[tuple[int, ...], ...]:
-    """Every k-length straight run of cell indices that fits on the board.
+    """Returns every k-length straight run of cells that fits on the board.
 
     Cached per shape.  Used by the heuristic evaluator and by threat counting.
+
+    Args:
+        rows: Board height.
+        cols: Board width.
+        k: Run length.
+
+    Returns:
+        A tuple of runs, each a tuple of k cell indices.
     """
     key = (rows, cols, k)
     got = _WINDOW_CACHE.get(key)
@@ -77,7 +103,14 @@ def windows(rows: int, cols: int, k: int) -> tuple[tuple[int, ...], ...]:
 
 
 def col_label(c: int) -> str:
-    """0 -> 'a', 25 -> 'z', 26 -> 'aa' (bijective base-26)."""
+    """Returns the letter label of a column: 0 -> 'a', 26 -> 'aa'.
+
+    Args:
+        c: Zero-based column index.
+
+    Returns:
+        The column's label in bijective base 26.
+    """
     s = ""
     c += 1
     while c:
@@ -87,6 +120,14 @@ def col_label(c: int) -> str:
 
 
 def col_index(s: str) -> int:
+    """Inverts :func:`col_label`.
+
+    Args:
+        s: A lower-case column label such as 'b' or 'aa'.
+
+    Returns:
+        The zero-based column index.
+    """
     n = 0
     for ch in s:
         n = n * 26 + (ord(ch) - ord("a") + 1)
@@ -99,6 +140,17 @@ class Board:
     Search pushes and pops moves rather than copying, which is what makes deep
     negamax affordable.  Anything that wants to keep a position around should
     call :meth:`copy`.
+
+    Attributes:
+        rows: Board height.
+        cols: Board width.
+        k: Stones in a row needed to win.
+        cells: EMPTY, X or O for every cell, row by row.
+        to_move: The player whose turn it is.
+        winner: None while in play, DRAW, or the player who won.
+        win_line: The winning run's cells once someone has won, else None.
+        last_move: The most recent move, or None on an empty board.
+        hash: Zobrist hash of the stones and the side to move (ignores k).
     """
 
     __slots__ = (
@@ -117,7 +169,18 @@ class Board:
 
     def __init__(
         self, rows: int = 3, cols: int | None = None, k: int | None = None
-    ):
+    ) -> None:
+        """Creates an empty board.
+
+        Args:
+            rows: Board height.
+            cols: Board width; defaults to ``rows``.
+            k: Stones in a row needed to win; defaults to the shorter side.
+
+        Raises:
+            ValueError: If the board is empty, k is below 1, or k is longer
+                than the longest side.
+        """
         cols = rows if cols is None else cols
         k = min(rows, cols) if k is None else k
         if rows < 1 or cols < 1:
@@ -145,24 +208,29 @@ class Board:
 
     @property
     def size(self) -> int:
+        """The number of cells."""
         return self.rows * self.cols
 
     @property
     def ply(self) -> int:
-        """Number of stones on the board."""
+        """The number of stones on the board."""
         return len(self._history)
 
     @property
     def spec(self) -> tuple[int, int, int]:
+        """The rules as a (rows, cols, k) tuple."""
         return (self.rows, self.cols, self.k)
 
     def coord(self, idx: int) -> tuple[int, int]:
+        """Returns the zero-based (row, col) of a cell index."""
         return divmod(idx, self.cols)
 
     def index(self, r: int, c: int) -> int:
+        """Returns the cell index of zero-based row ``r`` and column ``c``."""
         return r * self.cols + c
 
     def label(self, idx: int) -> str:
+        """Returns a cell's name, such as 'b2'."""
         r, c = self.coord(idx)
         return "%s%d" % (col_label(c), r + 1)
 
@@ -170,19 +238,31 @@ class Board:
 
     @property
     def is_terminal(self) -> bool:
+        """Whether the game is over (won or drawn)."""
         return self.winner is not None
 
     def legal_moves(self) -> list[int]:
+        """Returns the empty cells, or nothing once the game is over."""
         if self.winner is not None:
             return []
         return [i for i, v in enumerate(self.cells) if v == EMPTY]
 
     def legal_mask(self) -> list[bool]:
+        """Returns one flag per cell: True where a move is legal."""
         if self.winner is not None:
             return [False] * self.size
         return [v == EMPTY for v in self.cells]
 
     def push(self, move: int) -> None:
+        """Plays a stone for the side to move and updates the result.
+
+        Args:
+            move: The cell index to play.
+
+        Raises:
+            InvalidMove: If the game is over, the cell is off the board, or
+                the cell is taken.
+        """
         if self.winner is not None:
             raise InvalidMove("the game is already over")
         if not 0 <= move < self.size:
@@ -210,6 +290,14 @@ class Board:
         self.to_move = opponent(player)
 
     def pop(self) -> int:
+        """Takes back the last move, restoring the previous position exactly.
+
+        Returns:
+            The cell index that was taken back.
+
+        Raises:
+            InvalidMove: If no move has been played.
+        """
         if not self._history:
             raise InvalidMove("no move to undo")
         move, winner, win_line, last_move = self._history.pop()
@@ -223,7 +311,15 @@ class Board:
         return move
 
     def line_through(self, idx: int, player: int) -> tuple[int, ...] | None:
-        """The winning run through ``idx`` for ``player``, or None."""
+        """Returns the winning run through ``idx`` for ``player``, if any.
+
+        Args:
+            idx: The cell the run must pass through.
+            player: Whose stones count.
+
+        Returns:
+            The sorted cells of the first run of at least k found, or None.
+        """
         rows, cols, k, cells = self.rows, self.cols, self.k, self.cells
         r, c = divmod(idx, cols)
         for dr, dc in DIRECTIONS:
@@ -244,13 +340,22 @@ class Board:
         return None
 
     def winning_moves(self, player: int) -> list[int]:
-        """Empty cells that complete a run for ``player`` right now."""
+        """Returns the empty cells that would complete a run for ``player``."""
         return [
             i for i in self.legal_moves() if self.line_through_if(i, player)
         ]
 
     def line_through_if(self, idx: int, player: int) -> tuple[int, ...] | None:
-        """As :meth:`line_through`, hypothesising a ``player`` stone on ``idx``."""
+        """As :meth:`line_through`, with a ``player`` stone assumed on ``idx``.
+
+        Args:
+            idx: The cell to try.
+            player: Whose stone to assume.
+
+        Returns:
+            The winning run the stone would make, or None (also None when
+            the cell is already taken). The board is left unchanged.
+        """
         if self.cells[idx] != EMPTY:
             return None
         self.cells[idx] = player
@@ -262,7 +367,14 @@ class Board:
     # ---- results -------------------------------------------------------
 
     def result_for(self, player: int) -> float | None:
-        """+1 win, -1 loss, 0 draw, None if still in play."""
+        """Returns the result from one player's point of view.
+
+        Args:
+            player: X or O.
+
+        Returns:
+            1.0 for a win, -1.0 for a loss, 0.0 for a draw, None in play.
+        """
         if self.winner is None:
             return None
         if self.winner == DRAW:
@@ -270,6 +382,7 @@ class Board:
         return 1.0 if self.winner == player else -1.0
 
     def copy(self) -> Board:
+        """Returns an independent copy, undo history included."""
         b = Board.__new__(Board)
         b.rows, b.cols, b.k = self.rows, self.cols, self.k
         b.cells = list(self.cells)
@@ -283,6 +396,7 @@ class Board:
         return b
 
     def moves_played(self) -> list[int]:
+        """Returns the moves so far, in order."""
         return [h[0] for h in self._history]
 
     @classmethod
@@ -293,6 +407,20 @@ class Board:
         cols: int | None = None,
         k: int | None = None,
     ) -> Board:
+        """Builds a board by playing a sequence of moves.
+
+        Args:
+            moves: Cell indices, X first.
+            rows: Board height.
+            cols: Board width; defaults to ``rows``.
+            k: Stones in a row needed to win; defaults to the shorter side.
+
+        Returns:
+            The board after every move.
+
+        Raises:
+            InvalidMove: If any move is illegal.
+        """
         b = cls(rows, cols, k)
         for m in moves:
             b.push(m)
@@ -301,7 +429,17 @@ class Board:
     # ---- text I/O ------------------------------------------------------
 
     def parse_move(self, text: str) -> int:
-        """Accept 'b2', 'B2', '2,3' (1-indexed row,col), or a bare cell index."""
+        """Reads a move typed by a person.
+
+        Args:
+            text: 'b2' or 'B2', '2,3' (1-indexed row,col), or a cell index.
+
+        Returns:
+            The cell index. Whether the cell is empty is not checked.
+
+        Raises:
+            InvalidMove: If the text is empty, unreadable or off the board.
+        """
         t = text.strip().lower().replace(" ", "")
         if not t:
             raise InvalidMove("empty input")
@@ -326,7 +464,16 @@ class Board:
         raise InvalidMove(f"could not read {text.strip()!r} as a move")
 
     def render(self, color: bool = False, mark_last: bool = True) -> str:
-        """A grid with column letters and row numbers, sized to the board."""
+        """Draws the board as text, with column letters and row numbers.
+
+        Args:
+            color: Use ANSI colours: green for the winning run, cyan for the
+                last move, dim for empty cells.
+            mark_last: Highlight the last move (only with ``color``).
+
+        Returns:
+            The grid, one line per row, without a trailing newline.
+        """
         width = max(
             2, len(col_label(self.cols - 1)) + 1, len(str(self.rows)) + 1
         )

@@ -1,10 +1,11 @@
 """Tkinter front end, built on the same engine the CLI and the RL env use.
 
-    python3 -m tictactoe.gui --size 5 --k 4 --opponent negamax:5
-    python3 -m tictactoe.gui --opponent mynet:agent
-
 Nothing here knows how an opponent decides anything -- it only calls
 ``select(board)``, so your network drops in exactly where 'perfect' sits.
+
+Example:
+    python3 -m tictactoe.gui --size 5 --k 4 --opponent negamax:5
+    python3 -m tictactoe.gui --opponent mynet:agent
 """
 
 from __future__ import annotations
@@ -55,6 +56,21 @@ PRESETS = [
 
 
 class TicTacToeGUI:
+    """The game window: controls, board canvas and status line.
+
+    Engine moves and the solver overlay are computed on worker threads and
+    handed back through ``queue``, which :meth:`_poll` drains on the Tk
+    thread.
+
+    Attributes:
+        root: The Tk root window.
+        board: The position on screen.
+        agent: The opponent, or None when two humans share the board.
+        human_side: The side the human plays against an agent.
+        thinking: True while the opponent's move is being computed.
+        solver_values: Per-move solver results for the overlay.
+    """
+
     def __init__(
         self,
         root: tk.Tk,
@@ -64,8 +80,20 @@ class TicTacToeGUI:
         opponent_spec: str,
         human_side: int,
         show_solver: bool,
-        seed=None,
-    ):
+        seed: int | None = None,
+    ) -> None:
+        """Builds the window and starts the first game.
+
+        Args:
+            root: The Tk root window.
+            rows: Board height.
+            cols: Board width.
+            k: Stones in a row needed to win.
+            opponent_spec: Agent spec for the opponent, or 'human'.
+            human_side: X or O.
+            show_solver: Start with the solver overlay on.
+            seed: Seeds the opponent's randomness.
+        """
         self.root = root
         self.rng = random.Random(seed)
         self.board = game.Board(rows, cols, k)
@@ -120,7 +148,7 @@ class TicTacToeGUI:
         bar = ttk.Frame(self.root, style="T.TFrame", padding=(16, 14, 16, 6))
         bar.pack(fill="x")
 
-        def label(parent, text):
+        def label(parent: tk.Misc, text: str) -> ttk.Label:
             return ttk.Label(parent, text=text, style="T.TLabel")
 
         row1 = ttk.Frame(bar, style="T.TFrame")
@@ -258,6 +286,12 @@ class TicTacToeGUI:
     # ---- game flow ------------------------------------------------------
 
     def new_game(self, keep_position: bool = False) -> None:
+        """Starts a game from the controls, or refreshes the current one.
+
+        Args:
+            keep_position: Keep the board and opponent; only clear the
+                overlay and restart background work.
+        """
         if not keep_position:
             rows = max(3, min(15, int(self.rows_var.get())))
             cols = max(3, min(15, int(self.cols_var.get())))
@@ -283,6 +317,7 @@ class TicTacToeGUI:
         self.after_move()
 
     def undo(self) -> None:
+        """Takes back the last move, or the last two against an agent."""
         if self.thinking:
             return
         steps = 1 if self.agent is None else 2
@@ -294,11 +329,13 @@ class TicTacToeGUI:
         self.after_move()
 
     def human_to_move(self) -> bool:
+        """Whether a click should place a stone now."""
         if self.board.is_terminal or self.thinking:
             return False
         return self.agent is None or self.board.to_move == self.human_side
 
-    def on_click(self, event) -> None:
+    def on_click(self, event: tk.Event) -> None:
+        """Plays the clicked cell if it is the human's turn and it is empty."""
         if not self.human_to_move():
             return
         idx = self.cell_at(event.x, event.y)
@@ -309,12 +346,13 @@ class TicTacToeGUI:
         self.draw()
         self.after_move()
 
-    def on_motion(self, event) -> None:
+    def on_motion(self, event: tk.Event) -> None:
+        """Highlights the cell under the pointer when a click would play it."""
         self._set_hover(
             self.cell_at(event.x, event.y) if self.human_to_move() else None
         )
 
-    def _set_hover(self, idx) -> None:
+    def _set_hover(self, idx: int | None) -> None:
         if idx is not None and self.board.cells[idx] != game.EMPTY:
             idx = None
         if idx != self.hover:
@@ -387,14 +425,16 @@ class TicTacToeGUI:
 
     # ---- geometry -------------------------------------------------------
 
-    def metrics(self):
+    def metrics(self) -> tuple[float, float, float]:
+        """Returns the board's (x offset, y offset, cell size) on the canvas."""
         w = max(self.canvas.winfo_width(), 1)
         h = max(self.canvas.winfo_height(), 1)
         cell = max(12, min(w / self.board.cols, h / self.board.rows))
         bw, bh = cell * self.board.cols, cell * self.board.rows
         return (w - bw) / 2.0, (h - bh) / 2.0, cell
 
-    def cell_at(self, x, y):
+    def cell_at(self, x: float, y: float) -> int | None:
+        """Returns the cell under canvas point (x, y), or None if off-board."""
         ox, oy, cell = self.metrics()
         c = int((x - ox) // cell)
         r = int((y - oy) // cell)
@@ -405,6 +445,7 @@ class TicTacToeGUI:
     # ---- painting -------------------------------------------------------
 
     def draw(self) -> None:
+        """Repaints the board, stones, overlay and status line."""
         cv = self.canvas
         cv.delete("all")
         ox, oy, cell = self.metrics()
@@ -480,7 +521,7 @@ class TicTacToeGUI:
             )
         self._update_status()
 
-    def _solver_tag(self, result):
+    def _solver_tag(self, result: search.SearchResult) -> tuple[str, str]:
         if not result.exact:
             return ("%+.1f" % (result.value / 1000.0), EVEN)
         if abs(result.value) < search.WIN // 2:
@@ -527,7 +568,15 @@ class TicTacToeGUI:
         self.detail.configure(text="%dx%d, %d in a row" % (b.rows, b.cols, b.k))
 
 
-def main(argv=None) -> int:
+def main(argv: list[str] | None = None) -> int:
+    """Parses arguments and runs the window until it is closed.
+
+    Args:
+        argv: Arguments without the program name; sys.argv[1:] if None.
+
+    Returns:
+        0.
+    """
     p = argparse.ArgumentParser(
         prog="tictactoe.gui", description="Play tic-tac-toe in a window."
     )
