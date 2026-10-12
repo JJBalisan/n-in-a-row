@@ -5,3 +5,5 @@ __pycache__/
 !examples/solver_policy.npz
 *.jsonl
 .DS_Store
+.ruff_cache/
+*.egg-info/

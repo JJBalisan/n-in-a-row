@@ -21,18 +21,3 @@ tictactoe-gui = "tictactoe.gui:main"
 
 [tool.setuptools]
 packages = ["tictactoe"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py39"
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "UP", "B", "SIM", "C4", "RET", "PIE", "RUF", "I"]
-ignore = [
-    "RET504",   # a named return value is often clearer than inlining it
-    "SIM108",   # ternaries are not always more readable
-]
-
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["E402"]        # sys.path is set up before the package imports
-"examples/*" = ["E402"]
