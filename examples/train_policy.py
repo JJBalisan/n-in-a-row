@@ -196,7 +196,7 @@ def train(
             played = 0
 
         if g % max(1, games // 10) == 0:
-            print("  %6d games   win %.2f  draw %.2f" % (g, won / g, drawn / g))
+            print(f"  {g:6d} games   win {won / g:.2f}  draw {drawn / g:.2f}")
     return policy
 
 
@@ -265,8 +265,8 @@ def main(argv: list[str] | None = None) -> int:
     k = args.k or min(rows, cols)
 
     print(
-        "training a %d-unit policy on %dx%d (k=%d) against %s"
-        % (args.hidden, rows, cols, k, args.opponent)
+        f"training a {args.hidden}-unit policy on {rows}x{cols} (k={k}) "
+        f"against {args.opponent}"
     )
     policy = train(
         args.games,

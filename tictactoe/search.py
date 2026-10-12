@@ -53,7 +53,7 @@ class SearchResult(NamedTuple):
             return "draw"
         plies = WIN - abs(self.value)
         n = (plies + 1) // 2
-        return ("win in %d" % n) if self.value > 0 else ("loss in %d" % n)
+        return f"win in {int(n)}" if self.value > 0 else f"loss in {int(n)}"
 
 
 def _ordering_bias(rows: int, cols: int) -> list[float]:
@@ -217,13 +217,16 @@ class Negamax:
                 alpha = value
         return best_move, best_value, True
 
-    def _negamax(
+    def _negamax(  # noqa: PLR0912 - one hot per-node loop; helpers cost calls
         self, board: game.Board, depth: int, alpha: float, beta: float
     ) -> float:
         self.nodes += 1
-        if self._deadline is not None and (self.nodes & 1023) == 0:
-            if time.perf_counter() > self._deadline:
-                raise _TimeUp()
+        if (
+            self._deadline is not None
+            and (self.nodes & 1023) == 0
+            and time.perf_counter() > self._deadline
+        ):
+            raise _TimeUp()
 
         if board.winner is not None:
             if board.winner == game.DRAW:
@@ -280,6 +283,7 @@ class Negamax:
         self, board: game.Board, depth: int, tt_move: int | None = None
     ) -> list[int]:
         """Sorts legal moves: wins, blocks, cells near stones, then central."""
+        del depth  # Unused: the ordering does not vary with depth.
         moves = board.legal_moves()
         if not moves:
             return moves

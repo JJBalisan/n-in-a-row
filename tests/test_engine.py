@@ -104,7 +104,7 @@ class TestSearch(unittest.TestCase):
     def test_every_opening_draws(self):
         engine = search.Negamax()
         for m, r in engine.evaluate_moves(game.Board()).items():
-            self.assertEqual(r.outcome, "draw", "opening %d" % m)
+            self.assertEqual(r.outcome, "draw", f"opening {m}")
 
     def test_takes_the_win(self):
         b = game.Board.from_moves([0, 4, 1])  # X threatens c1

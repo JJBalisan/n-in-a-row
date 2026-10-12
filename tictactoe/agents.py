@@ -62,6 +62,7 @@ class Agent:
         Returns:
             The rationale for the last :meth:`select`, or None.
         """
+        del board  # Unused by the default, which has nothing to say.
         return None
 
     def __str__(self) -> str:
@@ -156,7 +157,7 @@ class NegamaxAgent(Agent):
         self.epsilon = epsilon
         self.rng = rng or random.Random()
         self.last: search.SearchResult | None = None
-        self.name = "perfect" if depth is None else "negamax:%d" % depth
+        self.name = "perfect" if depth is None else f"negamax:{depth}"
         if epsilon:
             self.name = f"noisy:{epsilon:g}:{self.name}"
 
@@ -173,15 +174,14 @@ class NegamaxAgent(Agent):
 
     def explain(self, board: game.Board) -> str | None:
         """Summarises the last search: outcome, depth, nodes and time."""
+        del board  # Unused: the summary is of the search already made.
         r = self.last
         if r is None:
             return "played at random (epsilon)"
-        return "%s, depth %d, %d nodes, %.2fs%s" % (
-            r.outcome,
-            r.depth,
-            r.nodes,
-            r.seconds,
-            "" if r.exact else " (horizon-limited)",
+        horizon = "" if r.exact else " (horizon-limited)"
+        return (
+            f"{r.outcome}, depth {r.depth}, {r.nodes} nodes, "
+            f"{r.seconds:.2f}s{horizon}"
         )
 
 
@@ -250,7 +250,7 @@ class HumanAgent(Agent):
                     f"{self.prompt} ({board.label(board.legal_moves()[0])}) > "
                 )
             except (EOFError, KeyboardInterrupt):
-                raise SystemExit("\nstopped")
+                raise SystemExit("\nstopped") from None
             cmd = raw.strip().lower()
             if cmd in ("q", "quit", "exit", "resign"):
                 raise SystemExit("resigned")
@@ -310,28 +310,86 @@ def load_agent(spec: str, rng: random.Random | None = None) -> Agent:
     spec = spec.strip()
     head, _, tail = spec.partition(":")
     head = head.strip()
+    builtin = _load_builtin(head, tail, rng)
+    if builtin is not None:
+        return builtin
+    return _load_attribute(spec, head, tail)
 
+
+def _load_builtin(head: str, tail: str, rng: random.Random) -> Agent | None:
+    """Builds the built-in agent ``head`` names, or None if it names none.
+
+    Args:
+        head: The spec up to its first colon, stripped.
+        tail: The rest of the spec after that colon.
+        rng: Shared by the agents built.
+
+    Returns:
+        The agent, or None when ``head`` is not a built-in.
+
+    Raises:
+        ValueError: If a numeric tail does not parse.
+    """
+    agent: Agent | None
     if head == "noisy":
-        eps_s, _, rest = tail.partition(":")
-        base = load_agent(rest or "perfect", rng)
-        if isinstance(base, NegamaxAgent):
-            base.epsilon = float(eps_s)
-            base.name = f"noisy:{eps_s}:{base.name}"
-            return base
-        return NoisyAgent(base, float(eps_s), rng)
-    if head == "random":
-        return RandomAgent(rng)
-    if head == "greedy":
-        return GreedyAgent(rng)
-    if head == "perfect":
-        return NegamaxAgent(depth=None, rng=rng)
-    if head == "negamax":
-        return NegamaxAgent(depth=int(tail), rng=rng)
-    if head == "time":
-        return NegamaxAgent(depth=None, time_limit=float(tail), rng=rng)
-    if head == "human":
-        return HumanAgent()
+        agent = _load_noisy(tail, rng)
+    elif head == "random":
+        agent = RandomAgent(rng)
+    elif head == "greedy":
+        agent = GreedyAgent(rng)
+    elif head == "perfect":
+        agent = NegamaxAgent(depth=None, rng=rng)
+    elif head == "negamax":
+        agent = NegamaxAgent(depth=int(tail), rng=rng)
+    elif head == "time":
+        agent = NegamaxAgent(depth=None, time_limit=float(tail), rng=rng)
+    elif head == "human":
+        agent = HumanAgent()
+    else:
+        agent = None
+    return agent
 
+
+def _load_noisy(tail: str, rng: random.Random) -> Agent:
+    """Builds ``noisy:P:AGENT``, folding P into a negamax agent's epsilon.
+
+    Args:
+        tail: ``P:AGENT``; AGENT defaults to ``perfect``.
+        rng: Shared by the agents built.
+
+    Returns:
+        The negamax agent with its epsilon set, or a :class:`NoisyAgent`
+        wrapping any other agent.
+
+    Raises:
+        ValueError: If P does not parse.
+    """
+    eps_s, _, rest = tail.partition(":")
+    base = load_agent(rest or "perfect", rng)
+    if isinstance(base, NegamaxAgent):
+        base.epsilon = float(eps_s)
+        base.name = f"noisy:{eps_s}:{base.name}"
+        return base
+    return NoisyAgent(base, float(eps_s), rng)
+
+
+def _load_attribute(spec: str, head: str, tail: str) -> Agent:
+    """Loads a ``module.path:attribute`` spec.
+
+    Args:
+        spec: The whole spec, for messages and a wrapped function's name.
+        head: The module path.
+        tail: The attribute name.
+
+    Returns:
+        A new agent, or the attribute itself when it is an Agent instance.
+
+    Raises:
+        ValueError: If there is no attribute part.
+        ImportError: If the module cannot be imported.
+        AttributeError: If the module has no such attribute.
+        TypeError: If the attribute does not yield an agent.
+    """
     if not tail:
         raise ValueError(
             "unknown agent {!r} -- expected one of {}, negamax:D, time:S, "

@@ -189,8 +189,8 @@ class Board:
             raise ValueError("k must be at least 1")
         if k > max(rows, cols):
             raise ValueError(
-                "k=%d cannot fit on a %dx%d board (max run length is %d)"
-                % (k, rows, cols, max(rows, cols))
+                f"k={k} cannot fit on a {rows}x{cols} board "
+                f"(max run length is {max(rows, cols)})"
             )
         self.rows = rows
         self.cols = cols
@@ -232,7 +232,7 @@ class Board:
     def label(self, idx: int) -> str:
         """Returns a cell's name, such as 'b2'."""
         r, c = self.coord(idx)
-        return "%s%d" % (col_label(c), r + 1)
+        return f"{col_label(c)}{r + 1}"
 
     # ---- play ----------------------------------------------------------
 
@@ -267,7 +267,7 @@ class Board:
             raise InvalidMove("the game is already over")
         if not 0 <= move < self.size:
             raise InvalidMove(
-                "move %r is off a %dx%d board" % (move, self.rows, self.cols)
+                f"move {move!r} is off a {self.rows}x{self.cols} board"
             )
         if self.cells[move] != EMPTY:
             raise InvalidMove(f"{self.label(move)} is already taken")
@@ -460,7 +460,7 @@ class Board:
             idx = int(t)
             if 0 <= idx < self.size:
                 return idx
-            raise InvalidMove("index %d is off the board" % idx)
+            raise InvalidMove(f"index {idx} is off the board")
         raise InvalidMove(f"could not read {text.strip()!r} as a move")
 
     def render(self, color: bool = False, mark_last: bool = True) -> str:
@@ -504,10 +504,7 @@ class Board:
         return self.render(color=False)
 
     def __repr__(self) -> str:
-        return "<Board %dx%d k=%d ply=%d to_move=%s>" % (
-            self.rows,
-            self.cols,
-            self.k,
-            self.ply,
-            SYMBOL[self.to_move],
+        return (
+            f"<Board {self.rows}x{self.cols} k={self.k} ply={self.ply} "
+            f"to_move={SYMBOL[self.to_move]}>"
         )
