@@ -323,7 +323,17 @@ class TestGuiHelpers(unittest.TestCase):
             ):
                 self.assertEqual(self.gui.main(argv), 0)
             root = tk_cls.return_value
-            gui_cls.assert_called_once_with(root, *want)
+            rows, cols, k, opponent, side, solver, seed = want
+            gui_cls.assert_called_once_with(
+                root,
+                rows,
+                cols,
+                k,
+                opponent_spec=opponent,
+                human_side=side,
+                show_solver=solver,
+                seed=seed,
+            )
             root.mainloop.assert_called_once_with()
 
 
@@ -349,7 +359,16 @@ class TestExamples(unittest.TestCase):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             policy = train_policy.train(
-                40, 'fake_agent:FirstLegal', 3, 3, 3, 8, 0.05, 8, 0, True
+                40,
+                'fake_agent:FirstLegal',
+                3,
+                3,
+                3,
+                hidden=8,
+                lr=0.05,
+                batch=8,
+                seed=0,
+                augment=True,
             )
         lines = out.getvalue().splitlines()
         self.assertEqual(len(lines), 10)
@@ -384,7 +403,9 @@ class TestExamples(unittest.TestCase):
             policy = train_policy.Policy(
                 x.shape[1], 8, 9, np.random.default_rng(0)
             )
-            learn_from_solver.fit(policy, x, m, p, 2, 64, 0.5, 0)
+            learn_from_solver.fit(
+                policy, x, m, p, epochs=2, batch=64, lr=0.5, seed=0
+            )
         self.assertEqual(len(positions), 119)
         self.assertEqual(x.shape, (952, 27))
         self.assertEqual(

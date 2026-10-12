@@ -117,6 +117,7 @@ class TicTacToeEnv:
         rows: int = 3,
         cols: int | None = None,
         k: int | None = None,
+        *,
         opponent: agents.Agent | None = None,
         agent_plays: int | None = game.X,
         illegal_move: str = "raise",
@@ -262,9 +263,9 @@ class TicTacToeEnv:
             self.rows,
             self.cols,
             self.k,
-            self.opponent,
-            self.agent_plays,
-            self.illegal_move,
+            opponent=self.opponent,
+            agent_plays=self.agent_plays,
+            illegal_move=self.illegal_move,
         )
         env.board = self.board.copy()
         return env
@@ -291,6 +292,7 @@ class BatchEnv:
         rows: int = 3,
         cols: int | None = None,
         k: int | None = None,
+        *,
         opponent_spec: str | None = None,
         seed: int | None = None,
         illegal_move: str = "raise",

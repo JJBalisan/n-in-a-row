@@ -53,6 +53,7 @@ def play_game(
     rows: int = 3,
     cols: int | None = None,
     k: int | None = None,
+    *,
     on_move: Callable[[game.Board, int, int], object] | None = None,
 ) -> GameRecord:
     """Plays one game to the end.
@@ -140,6 +141,7 @@ def play_match(
     agent_a: agents.Agent,
     agent_b: agents.Agent,
     games: int = 100,
+    *,
     rows: int = 3,
     cols: int | None = None,
     k: int | None = None,
@@ -199,6 +201,7 @@ def selfplay(
     rows: int = 3,
     cols: int | None = None,
     k: int | None = None,
+    *,
     seed: int | None = None,
 ) -> Iterator[GameRecord]:
     """Streams games between two independently seeded copies of one agent.

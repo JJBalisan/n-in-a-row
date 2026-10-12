@@ -97,6 +97,7 @@ def fit(
     X: np.ndarray,
     M: np.ndarray,
     P: np.ndarray,
+    *,
     epochs: int,
     batch: int,
     lr: float,
@@ -190,7 +191,16 @@ def main(argv: list[str] | None = None) -> int:
     rng = np.random.default_rng(args.seed)
     policy = train_policy.Policy(X.shape[1], args.hidden, rows * cols, rng)
     print("fitting")
-    fit(policy, X, M, P, args.epochs, args.batch, args.lr, args.seed)
+    fit(
+        policy,
+        X,
+        M,
+        P,
+        epochs=args.epochs,
+        batch=args.batch,
+        lr=args.lr,
+        seed=args.seed,
+    )
     policy.save(WEIGHTS)
     print(f"saved {WEIGHTS}\n")
 
@@ -203,9 +213,9 @@ def main(argv: list[str] | None = None) -> int:
             else max(40, args.eval_games // 4)
         )
         print(
-            arena.play_match(me, them, games, rows, cols, k).summary(
-                "distilled", them.name
-            )
+            arena.play_match(
+                me, them, games, rows=rows, cols=cols, k=k
+            ).summary("distilled", them.name)
         )
     return 0
 

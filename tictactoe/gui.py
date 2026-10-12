@@ -77,6 +77,7 @@ class TicTacToeGUI:
         rows: int,
         cols: int,
         k: int,
+        *,
         opponent_spec: str,
         human_side: int,
         show_solver: bool,
@@ -306,7 +307,7 @@ class TicTacToeGUI:
                     if self.opponent_spec == "human"
                     else agents.load_agent(self.opponent_spec, self.rng)
                 )
-            except Exception as exc:  # noqa: BLE001 - any spec error goes to a dialog
+            except Exception as exc:  # noqa: BLE001 - shown in a dialog
                 messagebox.showerror("Cannot load opponent", str(exc))
                 self.opponent_spec = "perfect"
                 self.opp_var.set("perfect")
@@ -377,7 +378,7 @@ class TicTacToeGUI:
         try:
             move = self.agent.select(snapshot)
             why = self.agent.explain(snapshot)
-        except Exception as exc:  # noqa: BLE001 - reported, not lost in the thread
+        except Exception as exc:  # noqa: BLE001 - sent to the queue
             self.queue.put(("error", str(exc)))
             return
         # Keep a slow-looking engine from feeling instant and a fast one from
@@ -607,10 +608,10 @@ def main(argv: list[str] | None = None) -> int:
         rows,
         cols,
         k,
-        args.opponent,
-        game.X if args.side.upper() == "X" else game.O,
-        args.solver or (rows * cols <= 9),
-        args.seed,
+        opponent_spec=args.opponent,
+        human_side=game.X if args.side.upper() == "X" else game.O,
+        show_solver=args.solver or (rows * cols <= 9),
+        seed=args.seed,
     )
     root.mainloop()
     return 0
