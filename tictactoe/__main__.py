@@ -1,3 +1,3 @@
-from .cli import main
+from tictactoe import cli
 
-raise SystemExit(main())
+raise SystemExit(cli.main())

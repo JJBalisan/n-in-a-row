@@ -54,7 +54,7 @@ def _require_numpy(test):
         test: The running unittest.TestCase.
     """
     try:
-        import numpy  # noqa: F401, PLC0415
+        import numpy as np  # noqa: F401
     except ImportError:
         if os.environ.get('CI'):
             test.fail(
@@ -271,7 +271,7 @@ def _import_gui(test):
         The tictactoe.gui module.
     """
     try:
-        from tictactoe import gui  # noqa: PLC0415
+        from tictactoe import gui
     except (ImportError, SystemExit):
         test.skipTest('tkinter is not available')
     return gui
@@ -332,7 +332,7 @@ class TestExamples(unittest.TestCase):
         _require_numpy(self)
 
     def test_tracked_policies_pick_the_same_moves(self):
-        from examples import learn_from_solver, train_policy  # noqa: PLC0415
+        from examples import learn_from_solver, train_policy
 
         positions = ([], [4], [0, 4], [0, 4, 8], [4, 0, 8])
         for module, want in (
@@ -344,7 +344,7 @@ class TestExamples(unittest.TestCase):
             self.assertEqual(got, want, module.__name__)
 
     def test_short_reinforce_run(self):
-        from examples import train_policy  # noqa: PLC0415
+        from examples import train_policy
 
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -373,9 +373,9 @@ class TestExamples(unittest.TestCase):
         )
 
     def test_short_distillation_run(self):
-        import numpy as np  # noqa: PLC0415
+        import numpy as np
 
-        from examples import learn_from_solver, train_policy  # noqa: PLC0415
+        from examples import learn_from_solver, train_policy
 
         out = io.StringIO()
         with contextlib.redirect_stdout(out):

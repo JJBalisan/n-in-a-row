@@ -25,11 +25,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from examples.train_policy import Policy, PolicyAgent
-from tictactoe.agents import load_agent
-from tictactoe.env import dihedral, encode, legal_mask
-from tictactoe.game import Board
-from tictactoe.search import Negamax
+from examples import train_policy
+from tictactoe import agents, arena, env as rl_env, game, search
 
 WEIGHTS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "solver_policy.npz"
@@ -41,7 +38,7 @@ def collect_positions(rows: int, cols: int, k: int, games: int, seed: int):
     rng = random.Random(seed)
     seen = {}
     for _ in range(games):
-        b = Board(rows, cols, k)
+        b = game.Board(rows, cols, k)
         while not b.is_terminal:
             if b.hash not in seen:
                 seen[b.hash] = b.copy()
@@ -51,7 +48,7 @@ def collect_positions(rows: int, cols: int, k: int, games: int, seed: int):
 
 def label(positions, depth, augment: bool):
     """Ask the engine for the optimal replies, as a probability over cells."""
-    engine = Negamax(max_depth=depth)
+    engine = search.Negamax(max_depth=depth)
     xs, ms, ps, vs = [], [], [], []
     for n, b in enumerate(positions, 1):
         values = engine.evaluate_moves(b)
@@ -62,16 +59,16 @@ def label(positions, depth, augment: bool):
         winners = [m for m, v in values.items() if v.value >= best - 1e-9]
         for m in winners:
             target[m] = 1.0 / len(winners)
-        obs = encode(b)
-        mask = legal_mask(b)
+        obs = rl_env.encode(b)
+        mask = rl_env.legal_mask(b)
         value = np.sign(best) if abs(best) > 1e-9 else 0.0
         variants = (
-            dihedral(obs, target, b.rows, b.cols)
+            rl_env.dihedral(obs, target, b.rows, b.cols)
             if augment
             else [(obs, target)]
         )
         masks = (
-            dihedral(obs, mask.astype(np.float32), b.rows, b.cols)
+            rl_env.dihedral(obs, mask.astype(np.float32), b.rows, b.cols)
             if augment
             else [(obs, mask.astype(np.float32))]
         )
@@ -90,7 +87,16 @@ def label(positions, depth, augment: bool):
     )
 
 
-def fit(policy: Policy, X, M, P, epochs: int, batch: int, lr: float, seed: int):
+def fit(
+    policy: train_policy.Policy,
+    X,
+    M,
+    P,
+    epochs: int,
+    batch: int,
+    lr: float,
+    seed: int,
+):
     """Plain masked-softmax cross-entropy against the solver's move distribution."""
     rng = np.random.default_rng(seed)
     n = len(X)
@@ -120,13 +126,13 @@ def fit(policy: Policy, X, M, P, epochs: int, batch: int, lr: float, seed: int):
     return policy
 
 
-def agent() -> PolicyAgent:
+def agent() -> train_policy.PolicyAgent:
     """Entry point for ``--opponent examples.learn_from_solver:agent``."""
     if not os.path.exists(WEIGHTS):
         raise FileNotFoundError(
             f"no trained weights at {WEIGHTS} -- run: python3 examples/learn_from_solver.py"
         )
-    return PolicyAgent(Policy.load(WEIGHTS))
+    return train_policy.PolicyAgent(train_policy.Policy.load(WEIGHTS))
 
 
 def main(argv=None) -> int:
@@ -178,24 +184,22 @@ def main(argv=None) -> int:
     )
 
     rng = np.random.default_rng(args.seed)
-    policy = Policy(X.shape[1], args.hidden, rows * cols, rng)
+    policy = train_policy.Policy(X.shape[1], args.hidden, rows * cols, rng)
     print("fitting")
     fit(policy, X, M, P, args.epochs, args.batch, args.lr, args.seed)
     policy.save(WEIGHTS)
     print(f"saved {WEIGHTS}\n")
 
-    from tictactoe.arena import play_match
-
-    me = PolicyAgent(policy)
+    me = train_policy.PolicyAgent(policy)
     for spec in ("random", "greedy", "perfect"):
-        them = load_agent(spec, random.Random(0))
+        them = agents.load_agent(spec, random.Random(0))
         games = (
             args.eval_games
             if spec != "perfect"
             else max(40, args.eval_games // 4)
         )
         print(
-            play_match(me, them, games, rows, cols, k).summary(
+            arena.play_match(me, them, games, rows, cols, k).summary(
                 "distilled", them.name
             )
         )

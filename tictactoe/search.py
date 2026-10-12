@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import NamedTuple
 
-from .game import DRAW, EMPTY, Board, opponent, windows
+from tictactoe import game
 
 WIN = 1_000_000
 
@@ -74,7 +74,7 @@ class Negamax:
 
     # ---- public ---------------------------------------------------------
 
-    def search(self, board: Board) -> SearchResult:
+    def search(self, board: game.Board) -> SearchResult:
         started = time.perf_counter()
         self.nodes = 0
         self._deadline = (
@@ -88,7 +88,7 @@ class Negamax:
         # board, so "win in 1" means one move from here whatever the ply count.
         self._root_ply = board.ply
         self._bias = _ordering_bias(board.rows, board.cols)
-        self._windows = windows(board.rows, board.cols, board.k)
+        self._windows = game.windows(board.rows, board.cols, board.k)
         self._weights = [0.0] + [10.0**i for i in range(board.k)]
 
         empties = len(board.legal_moves())
@@ -130,14 +130,14 @@ class Negamax:
             seconds=time.perf_counter() - started,
         )
 
-    def evaluate_moves(self, board: Board) -> dict[int, SearchResult]:
+    def evaluate_moves(self, board: game.Board) -> dict[int, SearchResult]:
         """Search every legal reply. Feeds the GUI's 'show the solver' overlay."""
         out = {}
         for m in board.legal_moves():
             board.push(m)
             try:
                 if board.is_terminal:
-                    value = 0.0 if board.winner == DRAW else float(WIN - 1)
+                    value = 0.0 if board.winner == game.DRAW else float(WIN - 1)
                     out[m] = SearchResult(m, value, 0, 1, True, 0.0)
                 else:
                     sub = self.search(board)
@@ -148,7 +148,7 @@ class Negamax:
 
     # ---- internals ------------------------------------------------------
 
-    def _root(self, board: Board, depth: int):
+    def _root(self, board: game.Board, depth: int):
         alpha, beta = -float("inf"), float("inf")
         best_move, best_value = None, -float("inf")
         for m in self._ordered(board, depth):
@@ -166,7 +166,7 @@ class Negamax:
         return best_move, best_value, True
 
     def _negamax(
-        self, board: Board, depth: int, alpha: float, beta: float
+        self, board: game.Board, depth: int, alpha: float, beta: float
     ) -> float:
         self.nodes += 1
         if self._deadline is not None and (self.nodes & 1023) == 0:
@@ -174,7 +174,7 @@ class Negamax:
                 raise _TimeUp()
 
         if board.winner is not None:
-            if board.winner == DRAW:
+            if board.winner == game.DRAW:
                 return 0.0
             # The side to move is the one who just got beaten.
             return -(WIN - (board.ply - self._root_ply))
@@ -225,15 +225,16 @@ class Negamax:
         return best
 
     def _ordered(
-        self, board: Board, depth: int, tt_move: int | None = None
+        self, board: game.Board, depth: int, tt_move: int | None = None
     ) -> list[int]:
         """Immediate wins, then blocks, then stones near the action, then centre."""
         moves = board.legal_moves()
         if not moves:
             return moves
         me = board.to_move
-        them = opponent(me)
+        them = game.opponent(me)
         cells, cols, rows = board.cells, board.cols, board.rows
+        empty = game.EMPTY
         bias = self._bias
 
         def neighbours(i: int) -> int:
@@ -247,7 +248,7 @@ class Negamax:
                     if (
                         0 <= rr < rows
                         and 0 <= cc < cols
-                        and cells[rr * cols + cc] != EMPTY
+                        and cells[rr * cols + cc] != empty
                     ):
                         n += 1
             return n
@@ -264,13 +265,14 @@ class Negamax:
         moves.sort(key=score, reverse=True)
         return moves
 
-    def _eval(self, board: Board) -> float:
+    def _eval(self, board: game.Board) -> float:
         """Threat count: every k-window that still belongs to one player only.
 
         A window with c of my stones and no opponent stone is worth 10**c, so a
         line one short of complete dominates one that is two short.
         """
         cells = board.cells
+        empty = game.EMPTY
         me = board.to_move
         w = self._weights
         total = 0.0
@@ -280,7 +282,7 @@ class Negamax:
                 v = cells[i]
                 if v == me:
                     mine += 1
-                elif v != EMPTY:
+                elif v != empty:
                     theirs += 1
             if mine and theirs:
                 continue
@@ -341,6 +343,6 @@ class _TimeUp(Exception):
     pass
 
 
-def solve(board: Board, max_depth: int | None = None) -> SearchResult:
+def solve(board: game.Board, max_depth: int | None = None) -> SearchResult:
     """One-shot convenience wrapper."""
     return Negamax(max_depth=max_depth).search(board)

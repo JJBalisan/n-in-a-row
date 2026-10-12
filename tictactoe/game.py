@@ -13,7 +13,7 @@ from collections.abc import Iterable
 
 EMPTY = 0
 X = 1
-O = 2
+O = 2  # noqa: E741 (public player constant)
 
 PLAYERS = (X, O)
 SYMBOL = {EMPTY: ".", X: "X", O: "O"}

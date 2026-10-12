@@ -12,15 +12,14 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from .agents import Agent, load_agent
-from .game import Board, InvalidMove, X, opponent
+from tictactoe import agents, game
 
 #: (own stones, opponent stones, side-to-move) -- the third plane is constant
 #: over the board and matters on sizes where moving first is a real edge.
 N_PLANES = 3
 
 
-def encode(board: Board, dtype=np.float32) -> np.ndarray:
+def encode(board: game.Board, dtype=np.float32) -> np.ndarray:
     """Canonical observation of shape ``(3, rows, cols)``."""
     cells = np.asarray(board.cells, dtype=np.int8).reshape(
         board.rows, board.cols
@@ -28,12 +27,12 @@ def encode(board: Board, dtype=np.float32) -> np.ndarray:
     me = board.to_move
     obs = np.zeros((N_PLANES, board.rows, board.cols), dtype=dtype)
     obs[0] = cells == me
-    obs[1] = cells == opponent(me)
-    obs[2] = 1.0 if me == X else 0.0
+    obs[1] = cells == game.opponent(me)
+    obs[2] = 1.0 if me == game.X else 0.0
     return obs
 
 
-def legal_mask(board: Board) -> np.ndarray:
+def legal_mask(board: game.Board) -> np.ndarray:
     """Boolean array of length ``rows*cols``. Mask your policy logits with this."""
     return np.asarray(board.legal_mask(), dtype=bool)
 
@@ -78,8 +77,8 @@ class TicTacToeEnv:
         rows: int = 3,
         cols: int | None = None,
         k: int | None = None,
-        opponent: Agent | None = None,
-        agent_plays: int | None = X,
+        opponent: agents.Agent | None = None,
+        agent_plays: int | None = game.X,
         illegal_move: str = "raise",
         seed: int | None = None,
     ):
@@ -92,7 +91,7 @@ class TicTacToeEnv:
         self.agent_plays = agent_plays
         self.illegal_move = illegal_move
         self.rng = random.Random(seed)
-        self.board = Board(self.rows, self.cols, self.k)
+        self.board = game.Board(self.rows, self.cols, self.k)
         self.n_actions = self.board.size
         self.observation_shape = (N_PLANES, self.rows, self.cols)
 
@@ -100,9 +99,9 @@ class TicTacToeEnv:
 
     def reset(self, swap_sides: bool = False) -> np.ndarray:
         """Start a new game. ``swap_sides`` alternates who moves first."""
-        self.board = Board(self.rows, self.cols, self.k)
+        self.board = game.Board(self.rows, self.cols, self.k)
         if swap_sides and self.opponent is not None:
-            self.agent_plays = opponent(self.agent_plays)
+            self.agent_plays = game.opponent(self.agent_plays)
         if self.opponent is not None:
             self.opponent.reset(self.board)
             if self.board.to_move != self.agent_plays:
@@ -118,7 +117,7 @@ class TicTacToeEnv:
         mover = self.board.to_move
         try:
             self.board.push(int(action))
-        except InvalidMove as exc:
+        except game.InvalidMove as exc:
             if self.illegal_move == "raise":
                 raise
             return (
@@ -215,7 +214,7 @@ class BatchEnv:
                 k,
                 opponent=None
                 if opponent_spec is None
-                else load_agent(
+                else agents.load_agent(
                     opponent_spec, random.Random(rng.getrandbits(32))
                 ),
                 illegal_move=illegal_move,

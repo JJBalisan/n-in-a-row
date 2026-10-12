@@ -11,8 +11,7 @@ import importlib
 import random
 from typing import Callable
 
-from .game import Board, InvalidMove, opponent
-from .search import Negamax, SearchResult
+from tictactoe import game, search
 
 
 class Agent:
@@ -20,16 +19,16 @@ class Agent:
 
     name = "agent"
 
-    def select(self, board: Board) -> int:
+    def select(self, board: game.Board) -> int:
         raise NotImplementedError
 
-    def observe(self, board: Board, move: int) -> None:
+    def observe(self, board: game.Board, move: int) -> None:
         """Called after every move by either side. Stateless agents ignore it."""
 
-    def reset(self, board: Board) -> None:
+    def reset(self, board: game.Board) -> None:
         """Called at the start of each game."""
 
-    def explain(self, board: Board) -> str | None:
+    def explain(self, board: game.Board) -> str | None:
         """Optional one-line rationale, shown by the CLI in verbose mode."""
         return None
 
@@ -43,7 +42,7 @@ class RandomAgent(Agent):
     def __init__(self, rng: random.Random | None = None):
         self.rng = rng or random.Random()
 
-    def select(self, board: Board) -> int:
+    def select(self, board: game.Board) -> int:
         return self.rng.choice(board.legal_moves())
 
 
@@ -59,9 +58,9 @@ class GreedyAgent(Agent):
     def __init__(self, rng: random.Random | None = None):
         self.rng = rng or random.Random()
 
-    def select(self, board: Board) -> int:
+    def select(self, board: game.Board) -> int:
         me = board.to_move
-        them = opponent(me)
+        them = game.opponent(me)
         wins = board.winning_moves(me)
         if wins:
             return self.rng.choice(wins)
@@ -93,15 +92,15 @@ class NegamaxAgent(Agent):
         epsilon: float = 0.0,
         rng: random.Random | None = None,
     ):
-        self.engine = Negamax(max_depth=depth, time_limit=time_limit)
+        self.engine = search.Negamax(max_depth=depth, time_limit=time_limit)
         self.epsilon = epsilon
         self.rng = rng or random.Random()
-        self.last: SearchResult | None = None
+        self.last: search.SearchResult | None = None
         self.name = "perfect" if depth is None else "negamax:%d" % depth
         if epsilon:
             self.name = f"noisy:{epsilon:g}:{self.name}"
 
-    def select(self, board: Board) -> int:
+    def select(self, board: game.Board) -> int:
         if self.epsilon and self.rng.random() < self.epsilon:
             self.last = None
             return self.rng.choice(board.legal_moves())
@@ -111,7 +110,7 @@ class NegamaxAgent(Agent):
             return self.rng.choice(board.legal_moves())
         return result.move
 
-    def explain(self, board: Board) -> str | None:
+    def explain(self, board: game.Board) -> str | None:
         r = self.last
         if r is None:
             return "played at random (epsilon)"
@@ -127,11 +126,11 @@ class NegamaxAgent(Agent):
 class FunctionAgent(Agent):
     """Wraps a plain ``fn(board) -> int``. Handy for a quick network policy."""
 
-    def __init__(self, fn: Callable[[Board], int], name: str = "callable"):
+    def __init__(self, fn: Callable[[game.Board], int], name: str = "callable"):
         self.fn = fn
         self.name = name
 
-    def select(self, board: Board) -> int:
+    def select(self, board: game.Board) -> int:
         return int(self.fn(board))
 
 
@@ -147,7 +146,7 @@ class HumanAgent(Agent):
         self.input_fn = input_fn
         self.output_fn = output_fn
 
-    def select(self, board: Board) -> int:
+    def select(self, board: game.Board) -> int:
         while True:
             try:
                 raw = self.input_fn(
@@ -168,7 +167,7 @@ class HumanAgent(Agent):
                 continue
             try:
                 return board.parse_move(raw)
-            except InvalidMove as exc:
+            except game.InvalidMove as exc:
                 self.output_fn(f"  {exc}")
 
 
@@ -252,10 +251,10 @@ class NoisyAgent(Agent):
         self.rng = rng or random.Random()
         self.name = f"noisy:{epsilon:g}:{base.name}"
 
-    def select(self, board: Board) -> int:
+    def select(self, board: game.Board) -> int:
         if self.rng.random() < self.epsilon:
             return self.rng.choice(board.legal_moves())
         return self.base.select(board)
 
-    def explain(self, board: Board):
+    def explain(self, board: game.Board):
         return self.base.explain(board)

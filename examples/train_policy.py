@@ -25,8 +25,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tictactoe.agents import Agent, load_agent
-from tictactoe.env import TicTacToeEnv, dihedral
+from tictactoe import agents, arena, env as rl_env
 
 WEIGHTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "policy.npz")
 
@@ -105,7 +104,10 @@ class Policy:
 
 
 def rollout(
-    policy: Policy, env: TicTacToeEnv, rng: np.random.Generator, augment: bool
+    policy: Policy,
+    env: rl_env.TicTacToeEnv,
+    rng: np.random.Generator,
+    augment: bool,
 ):
     """One game. Returns (observations, masks, actions, final reward)."""
     obs = env.reset(swap_sides=bool(rng.integers(2)))
@@ -133,8 +135,8 @@ def _augment(xs, ms, acts, env):
         onehot = np.zeros(env.n_actions, dtype=np.float32)
         onehot[a] = 1.0
         obs = x.reshape(shape)
-        variants = dihedral(obs, onehot, env.rows, env.cols)
-        masks = dihedral(obs, m.astype(np.float32), env.rows, env.cols)
+        variants = rl_env.dihedral(obs, onehot, env.rows, env.cols)
+        masks = rl_env.dihedral(obs, m.astype(np.float32), env.rows, env.cols)
         for (obs_t, pol_t), (_, mask_t) in zip(variants, masks):
             out_x.append(obs_t.reshape(-1))
             out_m.append(mask_t.astype(bool))
@@ -156,8 +158,8 @@ def train(
     entropy: float = 0.01,
 ) -> Policy:
     rng = np.random.default_rng(seed)
-    env = TicTacToeEnv(
-        rows, cols, k, opponent=load_agent(opponent_spec), seed=seed
+    env = rl_env.TicTacToeEnv(
+        rows, cols, k, opponent=agents.load_agent(opponent_spec), seed=seed
     )
     n_in = int(np.prod(env.observation_shape))
     policy = Policy(n_in, hidden, env.n_actions, rng)
@@ -195,15 +197,14 @@ def train(
 def evaluate(
     policy: Policy, spec: str, games: int, rows: int, cols: int, k: int
 ) -> str:
-    from tictactoe.arena import play_match
 
     me = PolicyAgent(policy)
-    them = load_agent(spec)
-    res = play_match(me, them, games, rows, cols, k)
+    them = agents.load_agent(spec)
+    res = arena.play_match(me, them, games, rows, cols, k)
     return res.summary("policy", them.name)
 
 
-class PolicyAgent(Agent):
+class PolicyAgent(agents.Agent):
     """The trained net, wearing the Agent interface the rest of the code expects."""
 
     name = "policy"
@@ -214,10 +215,9 @@ class PolicyAgent(Agent):
         self.rng = np.random.default_rng(seed)
 
     def select(self, board) -> int:
-        from tictactoe.env import encode, legal_mask
 
-        x = encode(board).reshape(1, -1).astype(np.float64)
-        m = legal_mask(board)[None, :]
+        x = rl_env.encode(board).reshape(1, -1).astype(np.float64)
+        m = rl_env.legal_mask(board)[None, :]
         p = self.policy.probs(x, m)[0]
         if self.greedy:
             return int(np.argmax(p))

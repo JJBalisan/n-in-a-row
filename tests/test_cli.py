@@ -17,8 +17,7 @@ _TESTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)  # so agent specs can name fake_agent
 
-from tictactoe import cli
-from tictactoe.game import DRAW, Board, O, X
+from tictactoe import cli, game
 
 
 def run_cli(argv):
@@ -109,7 +108,7 @@ def replay_record(rec):
     Returns:
         The board after every recorded move.
     """
-    board = Board(rec["rows"], rec["cols"], rec["k"])
+    board = game.Board(rec["rows"], rec["cols"], rec["k"])
     for move in rec["moves"]:
         board.push(move)
     return board
@@ -342,8 +341,8 @@ class TestMatch(unittest.TestCase):
                 board = replay_record(rec)
                 self.assertTrue(board.is_terminal)
                 self.assertEqual(board.winner, rec["winner"])
-                a_side = X if i % 2 == 0 else O  # colours alternate
-                if rec["winner"] == DRAW:
+                a_side = game.X if i % 2 == 0 else game.O  # colours alternate
+                if rec["winner"] == game.DRAW:
                     draws += 1
                 elif rec["winner"] == a_side:
                     wins += 1
@@ -454,14 +453,16 @@ class TestSelfplay(unittest.TestCase):
 
             records = read_jsonl(out)
             self.assertEqual(len(records), 12)
-            tally = {X: 0, O: 0, DRAW: 0}
+            tally = {game.X: 0, game.O: 0, game.DRAW: 0}
             for rec in records:
                 self.assertEqual(
                     (rec["rows"], rec["cols"], rec["k"]), (4, 4, 3)
                 )
                 self.assertEqual(replay_record(rec).winner, rec["winner"])
                 tally[rec["winner"]] += 1
-            self.assertEqual(printed, (tally[X], tally[O], tally[DRAW]))
+            self.assertEqual(
+                printed, (tally[game.X], tally[game.O], tally[game.DRAW])
+            )
 
     def test_same_seed_same_file(self):
         with tempfile.TemporaryDirectory() as tmp:

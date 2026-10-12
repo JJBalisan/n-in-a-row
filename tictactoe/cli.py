@@ -14,10 +14,7 @@ import random
 import sys
 import time
 
-from .agents import HumanAgent, Undo, load_agent
-from .arena import GameRecord, play_match, selfplay
-from .game import DRAW, SYMBOL, Board, InvalidMove, O, X
-from .search import Negamax
+from tictactoe import agents, arena, game, search
 
 
 def _shape_args(p: argparse.ArgumentParser) -> None:
@@ -61,15 +58,21 @@ def _color(stream=sys.stdout) -> bool:
 def cmd_play(args) -> int:
     rows, cols, k = _shape(args)
     rng = random.Random(args.seed)
-    board = Board(rows, cols, k)
-    engine = load_agent(args.opponent, rng)
-    human = HumanAgent()
-    human_side = X if args.side.upper() == "X" else O
+    board = game.Board(rows, cols, k)
+    engine = agents.load_agent(args.opponent, rng)
+    human = agents.HumanAgent()
+    human_side = game.X if args.side.upper() == "X" else game.O
     color = _color()
 
     print(
         "\n%dx%d, %d in a row. You are %s against %s."
-        % (board.rows, board.cols, board.k, SYMBOL[human_side], engine.name)
+        % (
+            board.rows,
+            board.cols,
+            board.k,
+            game.SYMBOL[human_side],
+            engine.name,
+        )
     )
     print("Enter a cell like b2. 'undo' takes back, 'quit' leaves.\n")
 
@@ -79,7 +82,7 @@ def cmd_play(args) -> int:
         if board.to_move == human_side:
             try:
                 move = human.select(board)
-            except Undo:
+            except agents.Undo:
                 if board.ply >= 2:
                     board.pop()
                     board.pop()
@@ -108,7 +111,7 @@ def cmd_play(args) -> int:
 
     print(board.render(color=color))
     print()
-    if board.winner == DRAW:
+    if board.winner == game.DRAW:
         print("Drawn.")
     elif board.winner == human_side:
         print(
@@ -131,9 +134,9 @@ def cmd_play(args) -> int:
 def cmd_match(args) -> int:
     rows, cols, k = _shape(args)
     rng = random.Random(args.seed)
-    a = load_agent(args.a, random.Random(rng.getrandbits(32)))
-    b = load_agent(args.b, random.Random(rng.getrandbits(32)))
-    records: list[GameRecord] | None = [] if args.out else None
+    a = agents.load_agent(args.a, random.Random(rng.getrandbits(32)))
+    b = agents.load_agent(args.b, random.Random(rng.getrandbits(32)))
+    records: list[arena.GameRecord] | None = [] if args.out else None
 
     started = time.perf_counter()
 
@@ -143,7 +146,7 @@ def cmd_match(args) -> int:
         sys.stderr.write("\r  %d/%d  score %.3f " % (done, total, res.score))
         sys.stderr.flush()
 
-    res = play_match(
+    res = arena.play_match(
         a,
         b,
         args.games,
@@ -173,11 +176,11 @@ def cmd_match(args) -> int:
 def cmd_selfplay(args) -> int:
     rows, cols, k = _shape(args)
     started = time.perf_counter()
-    counts = {X: 0, O: 0, DRAW: 0}
+    counts = {game.X: 0, game.O: 0, game.DRAW: 0}
     n = 0
     handle = open(args.out, "w") if args.out else None
     try:
-        for rec in selfplay(
+        for rec in arena.selfplay(
             args.agent, args.games, rows, cols, k, seed=args.seed
         ):
             counts[rec.winner] = counts.get(rec.winner, 0) + 1
@@ -199,7 +202,11 @@ def cmd_selfplay(args) -> int:
     )
     print(
         "  X %d   O %d   drawn %d"
-        % (counts.get(X, 0), counts.get(O, 0), counts.get(DRAW, 0))
+        % (
+            counts.get(game.X, 0),
+            counts.get(game.O, 0),
+            counts.get(game.DRAW, 0),
+        )
     )
     if args.out:
         print(
@@ -220,18 +227,18 @@ def _write_records(records, path: str) -> None:
 
 def cmd_solve(args) -> int:
     rows, cols, k = _shape(args)
-    board = Board(rows, cols, k)
+    board = game.Board(rows, cols, k)
     for token in args.moves:
         board.push(board.parse_move(token))
     print(board.render(color=_color()))
     print()
-    engine = Negamax(max_depth=args.depth, time_limit=args.time)
+    engine = search.Negamax(max_depth=args.depth, time_limit=args.time)
     started = time.perf_counter()
     per_move = engine.evaluate_moves(board)
     result = engine.search(board)
     print(
         "{} to move: {}{}".format(
-            SYMBOL[board.to_move],
+            game.SYMBOL[board.to_move],
             result.outcome,
             "" if result.exact else "  (horizon-limited estimate)",
         )
@@ -263,7 +270,7 @@ def cmd_bench(args) -> int:
     plies = 0
     rng = random.Random(args.seed or 0)
     for _ in range(args.games):
-        b = Board(rows, cols, k)
+        b = game.Board(rows, cols, k)
         while not b.is_terminal:
             b.push(rng.choice(b.legal_moves()))
             plies += 1
@@ -273,8 +280,8 @@ def cmd_bench(args) -> int:
         % (args.games, plies, dt, plies / max(1e-9, dt))
     )
 
-    engine = Negamax(max_depth=args.depth)
-    b = Board(rows, cols, k)
+    engine = search.Negamax(max_depth=args.depth)
+    b = game.Board(rows, cols, k)
     t = time.perf_counter()
     r = engine.search(b)
     dt = time.perf_counter() - t
@@ -289,12 +296,12 @@ def cmd_bench(args) -> int:
     )
 
     try:
-        import numpy  # noqa: F401
-        import numpy as np
+        # NumPy is optional: without it the batchenv line reports a skip.
+        import numpy as np  # noqa: PLC0415
 
-        from .env import BatchEnv
+        from tictactoe import env as rl_env  # noqa: PLC0415
 
-        env = BatchEnv(
+        env = rl_env.BatchEnv(
             args.batch, rows, cols, k, opponent_spec=None, seed=args.seed
         )
         env.reset()
@@ -403,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except InvalidMove as exc:
+    except game.InvalidMove as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:

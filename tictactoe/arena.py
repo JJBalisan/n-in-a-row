@@ -2,25 +2,24 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import random
 from collections.abc import Iterator
-from dataclasses import dataclass, field
 
-from .agents import Agent, load_agent
-from .game import DRAW, Board, O, X
+from tictactoe import agents, game
 
 
-@dataclass
+@dataclasses.dataclass
 class GameRecord:
     rows: int
     cols: int
     k: int
-    moves: list[int] = field(default_factory=list)
+    moves: list[int] = dataclasses.field(default_factory=list)
     winner: int | None = None  # 0 draw, 1 X, 2 O
 
     def result_for(self, player: int) -> float:
-        if self.winner == DRAW:
+        if self.winner == game.DRAW:
             return 0.0
         return 1.0 if self.winner == player else -1.0
 
@@ -37,16 +36,16 @@ class GameRecord:
 
 
 def play_game(
-    x_agent: Agent,
-    o_agent: Agent,
+    x_agent: agents.Agent,
+    o_agent: agents.Agent,
     rows: int = 3,
     cols: int | None = None,
     k: int | None = None,
     on_move=None,
 ) -> GameRecord:
     """Play one game to the end and return the move list plus the result."""
-    board = Board(rows, cols, k)
-    players = {X: x_agent, O: o_agent}
+    board = game.Board(rows, cols, k)
+    players = {game.X: x_agent, game.O: o_agent}
     for a in players.values():
         a.reset(board)
     while not board.is_terminal:
@@ -62,16 +61,16 @@ def play_game(
     )
 
 
-@dataclass
+@dataclasses.dataclass
 class MatchResult:
     games: int = 0
     wins: int = 0  # for agent A
     draws: int = 0
     losses: int = 0
-    as_x: dict[str, int] = field(
+    as_x: dict[str, int] = dataclasses.field(
         default_factory=lambda: {"w": 0, "d": 0, "l": 0}
     )
-    as_o: dict[str, int] = field(
+    as_o: dict[str, int] = dataclasses.field(
         default_factory=lambda: {"w": 0, "d": 0, "l": 0}
     )
 
@@ -105,8 +104,8 @@ class MatchResult:
 
 
 def play_match(
-    agent_a: Agent,
-    agent_b: Agent,
+    agent_a: agents.Agent,
+    agent_b: agents.Agent,
     games: int = 100,
     rows: int = 3,
     cols: int | None = None,
@@ -128,7 +127,7 @@ def play_match(
         )
         if records is not None:
             records.append(rec)
-        a_side = X if a_is_x else O
+        a_side = game.X if a_is_x else game.O
         outcome = rec.result_for(a_side)
         bucket = res.as_x if a_is_x else res.as_o
         res.games += 1
@@ -157,8 +156,8 @@ def selfplay(
     """Stream games between two independently-seeded copies of one agent."""
     rng = random.Random(seed)
     for _ in range(games):
-        a = load_agent(agent_spec, random.Random(rng.getrandbits(32)))
-        b = load_agent(agent_spec, random.Random(rng.getrandbits(32)))
+        a = agents.load_agent(agent_spec, random.Random(rng.getrandbits(32)))
+        b = agents.load_agent(agent_spec, random.Random(rng.getrandbits(32)))
         yield play_game(a, b, rows, cols, k)
 
 
@@ -169,7 +168,7 @@ def replay(record: GameRecord):
     target a value head wants.  Each yielded board is a fresh copy, so callers
     can encode it at leisure.
     """
-    board = Board(record.rows, record.cols, record.k)
+    board = game.Board(record.rows, record.cols, record.k)
     for move in record.moves:
         value = record.result_for(board.to_move)
         yield board.copy(), move, value

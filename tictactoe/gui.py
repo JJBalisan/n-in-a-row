@@ -10,6 +10,7 @@ Nothing here knows how an opponent decides anything -- it only calls
 from __future__ import annotations
 
 import argparse
+import contextlib
 import queue
 import random
 import threading
@@ -17,7 +18,7 @@ import time
 
 try:
     import tkinter as tk
-    from tkinter import font as tkfont, messagebox, ttk
+    from tkinter import messagebox, ttk
 except ImportError as exc:  # pragma: no cover
     raise SystemExit(
         "tkinter is not available for this interpreter.\n"
@@ -26,11 +27,7 @@ except ImportError as exc:  # pragma: no cover
         "The CLI (python3 -m tictactoe) needs no extra packages."
     ) from exc
 
-import contextlib
-
-from .agents import Agent, load_agent
-from .game import DRAW, EMPTY, Board, O, X
-from .search import WIN, Negamax
+from tictactoe import agents, game, search
 
 BG = "#12150F"
 GRID = "#3A4235"
@@ -71,14 +68,14 @@ class TicTacToeGUI:
     ):
         self.root = root
         self.rng = random.Random(seed)
-        self.board = Board(rows, cols, k)
+        self.board = game.Board(rows, cols, k)
         self.opponent_spec = opponent_spec
         self.human_side = human_side
-        self.agent: Agent | None = None
+        self.agent: agents.Agent | None = None
         self.thinking = False
         self.queue: queue.Queue = queue.Queue()
         self.solver_values: dict[int, object] = {}
-        self.solver_engine = Negamax(max_depth=None, time_limit=2.0)
+        self.solver_engine = search.Negamax(max_depth=None, time_limit=2.0)
         self.hover: int | None = None
 
         root.title("Tic-Tac-Toe")
@@ -191,7 +188,9 @@ class TicTacToeGUI:
         )
         combo.pack(side="left", padx=(6, 14))
         label(row2, "you play").pack(side="left")
-        self.side_var = tk.StringVar(value="X" if self.human_side == X else "O")
+        self.side_var = tk.StringVar(
+            value="X" if self.human_side == game.X else "O"
+        )
         ttk.Combobox(
             row2,
             textvariable=self.side_var,
@@ -264,20 +263,20 @@ class TicTacToeGUI:
             cols = max(3, min(15, int(self.cols_var.get())))
             k = max(2, min(max(rows, cols), int(self.k_var.get())))
             self.k_var.set(k)
-            self.board = Board(rows, cols, k)
+            self.board = game.Board(rows, cols, k)
             self.opponent_spec = self.opp_var.get().strip() or "perfect"
-            self.human_side = X if self.side_var.get() == "X" else O
+            self.human_side = game.X if self.side_var.get() == "X" else game.O
             try:
                 self.agent = (
                     None
                     if self.opponent_spec == "human"
-                    else load_agent(self.opponent_spec, self.rng)
+                    else agents.load_agent(self.opponent_spec, self.rng)
                 )
             except Exception as exc:
                 messagebox.showerror("Cannot load opponent", str(exc))
                 self.opponent_spec = "perfect"
                 self.opp_var.set("perfect")
-                self.agent = load_agent("perfect", self.rng)
+                self.agent = agents.load_agent("perfect", self.rng)
         self.solver_values = {}
         self.thinking = False
         self.draw()
@@ -303,7 +302,7 @@ class TicTacToeGUI:
         if not self.human_to_move():
             return
         idx = self.cell_at(event.x, event.y)
-        if idx is None or self.board.cells[idx] != EMPTY:
+        if idx is None or self.board.cells[idx] != game.EMPTY:
             return
         self.board.push(idx)
         self.solver_values = {}
@@ -316,7 +315,7 @@ class TicTacToeGUI:
         )
 
     def _set_hover(self, idx) -> None:
-        if idx is not None and self.board.cells[idx] != EMPTY:
+        if idx is not None and self.board.cells[idx] != game.EMPTY:
             idx = None
         if idx != self.hover:
             self.hover = idx
@@ -367,7 +366,7 @@ class TicTacToeGUI:
                     self.thinking = False
                     if (
                         not self.board.is_terminal
-                        and self.board.cells[move] == EMPTY
+                        and self.board.cells[move] == game.EMPTY
                     ):
                         self.board.push(move)
                     self.detail.configure(text=why or "")
@@ -421,14 +420,14 @@ class TicTacToeGUI:
             fill = CELL
             if i in win:
                 fill = "#1E2A20"
-            elif i == self.hover and b.cells[i] == EMPTY:
+            elif i == self.hover and b.cells[i] == game.EMPTY:
                 fill = CELL_HOVER
             cv.create_rectangle(
                 x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill=fill, outline=GRID, width=1
             )
 
             v = b.cells[i]
-            if v == X:
+            if v == game.X:
                 col = WIN_COLOR if i in win else X_COLOR
                 cv.create_line(
                     x0 + pad,
@@ -448,7 +447,7 @@ class TicTacToeGUI:
                     width=lw,
                     capstyle="round",
                 )
-            elif v == O:
+            elif v == game.O:
                 col = WIN_COLOR if i in win else O_COLOR
                 cv.create_oval(
                     x0 + pad,
@@ -484,21 +483,21 @@ class TicTacToeGUI:
     def _solver_tag(self, result):
         if not result.exact:
             return ("%+.1f" % (result.value / 1000.0), EVEN)
-        if abs(result.value) < WIN // 2:
+        if abs(result.value) < search.WIN // 2:
             return ("D", EVEN)
-        n = (WIN - abs(result.value) + 1) // 2
+        n = (search.WIN - abs(result.value) + 1) // 2
         return ("W%d" % n, GOOD) if result.value > 0 else ("L%d" % n, BAD)
 
     def _update_status(self) -> None:
         b = self.board
         if b.is_terminal:
-            if b.winner == DRAW:
+            if b.winner == game.DRAW:
                 self.status.configure(text="Drawn.", fg=INK)
             else:
                 who = (
                     "You"
                     if (self.agent is not None and b.winner == self.human_side)
-                    else ("Player %s" % ("X" if b.winner == X else "O"))
+                    else ("Player %s" % ("X" if b.winner == game.X else "O"))
                     if self.agent is None
                     else self.opponent_spec
                 )
@@ -515,12 +514,14 @@ class TicTacToeGUI:
             return
         if self.agent is None:
             self.status.configure(
-                text="Player %s to move." % ("X" if b.to_move == X else "O"),
+                text="Player %s to move."
+                % ("X" if b.to_move == game.X else "O"),
                 fg=INK,
             )
         else:
             self.status.configure(
-                text="Your move (%s)." % ("X" if self.human_side == X else "O"),
+                text="Your move (%s)."
+                % ("X" if self.human_side == game.X else "O"),
                 fg=INK,
             )
         self.detail.configure(text="%dx%d, %d in a row" % (b.rows, b.cols, b.k))
@@ -558,7 +559,7 @@ def main(argv=None) -> int:
         cols,
         k,
         args.opponent,
-        X if args.side.upper() == "X" else O,
+        game.X if args.side.upper() == "X" else game.O,
         args.solver or (rows * cols <= 9),
         args.seed,
     )

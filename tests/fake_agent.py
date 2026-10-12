@@ -11,10 +11,10 @@ Each attribute is one of the shapes load_agent accepts (or must reject):
     fake_agent:Interrupts     an agent whose select() acts like Ctrl-C
 """
 
-from tictactoe.agents import Agent
+from tictactoe import agents
 
 
-class FirstLegal(Agent):
+class FirstLegal(agents.Agent):
     """Plays the lowest-numbered empty cell."""
 
     name = "first-legal"
@@ -31,7 +31,7 @@ class FirstLegal(Agent):
         return board.legal_moves()[0]
 
 
-class LastLegal(Agent):
+class LastLegal(agents.Agent):
     """Plays the highest-numbered empty cell."""
 
     name = "last-legal"
@@ -48,7 +48,7 @@ class LastLegal(Agent):
         return board.legal_moves()[-1]
 
 
-class Interrupts(Agent):
+class Interrupts(agents.Agent):
     """Raises KeyboardInterrupt on its first move, as if Ctrl-C was pressed."""
 
     name = "interrupts"
