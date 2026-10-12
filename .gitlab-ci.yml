@@ -1,0 +1,13 @@
+# One job: install with the test extra (NumPy) and run the unittest suite.
+# GitLab sets CI=true, so the env tests fail instead of skipping if NumPy is
+# ever missing here.
+# Pipelines report zero jobs until the GitLab account is identity-verified;
+# that is an account setting, not a problem with this file.
+test:
+  image: python:3.12-slim
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PYTHONDONTWRITEBYTECODE: "1"
+  script:
+    - python -m pip install --quiet -e ".[test]"
+    - python -m unittest discover -s tests -v

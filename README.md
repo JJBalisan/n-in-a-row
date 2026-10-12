@@ -21,7 +21,7 @@ anything you train drops into either one without changes.
 cd tictactoe
 python3 -m tictactoe play --size 5 -k 4 --opponent negamax:5   # play in the terminal
 python3 -m tictactoe.gui --size 5 -k 4 --opponent negamax:5    # play in a window
-python3 -m unittest discover -s tests                          # 28 tests, no deps
+python3 -m unittest discover -s tests                          # stdlib only; see Tests
 ```
 
 Board shape is `--size N` for N×N, or `--rows R --cols C` for a rectangle;
@@ -176,8 +176,27 @@ tictactoe/
   cli.py       play / match / selfplay / solve / bench
   gui.py       Tkinter board                                          [tkinter]
 examples/      learn_from_solver.py, train_policy.py
-tests/         test_engine.py -- 28 tests, stdlib unittest
+tests/         test_engine.py, test_cli.py, test_agents.py (+ fake_agent.py) -- stdlib unittest
 ```
+
+## Tests
+
+```bash
+python3 -m unittest discover -s tests            # anywhere, nothing installed
+pip install -e '.[test]'                         # adds NumPy for the env tests
+CI=1 python3 -m unittest discover -s tests       # what CI runs
+```
+
+The `TestEnv` cases need NumPy. Locally they skip when it is missing; when the
+`CI` environment variable is set (GitLab and GitHub set `CI=true`) a missing
+NumPy fails them instead, so a green pipeline always means `env.py` was tested.
+The `test` extra in `pyproject.toml` installs it. `.gitlab-ci.yml` runs one job:
+install with the test extra, then the suite. GitLab runs zero jobs until the
+account is identity-verified.
+
+Tests marked `@unittest.expectedFailure` pin known, not-yet-fixed defects (their
+docstrings say which); the run stays green while they fail and goes red once a
+fix makes one pass, so remove the decorator with the fix.
 
 ## Interpreters on this machine
 

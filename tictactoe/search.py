@@ -61,6 +61,7 @@ class Negamax:
         self.time_limit = time_limit
         self.tt_size = tt_size
         self._tt: dict[int, tuple[int, int, float, int | None]] = {}
+        self._tt_spec: tuple[int, int, int] | None = None
         self.nodes = 0
         self._deadline = None
         self._root_ply = 0
@@ -74,6 +75,10 @@ class Negamax:
         started = time.perf_counter()
         self.nodes = 0
         self._deadline = None if self.time_limit is None else started + self.time_limit
+        # Board.hash ignores k, so entries from other rules would be stale.
+        if board.spec != self._tt_spec:
+            self._tt.clear()
+            self._tt_spec = board.spec
         # Mate scores count plies from *this* position, not from the empty
         # board, so "win in 1" means one move from here whatever the ply count.
         self._root_ply = board.ply
@@ -173,6 +178,7 @@ class Negamax:
         tt_move = None
         if hit is not None:
             h_depth, flag, value, tt_move = hit
+            value = _mate_from_tt(value, board.ply - self._root_ply)
             if h_depth >= depth:
                 if flag == EXACT:
                     return value
@@ -205,7 +211,8 @@ class Negamax:
                 flag = LOWER
             else:
                 flag = EXACT
-            self._tt[key] = (depth, flag, best, best_move)
+            stored = _mate_to_tt(best, board.ply - self._root_ply)
+            self._tt[key] = (depth, flag, stored, best_move)
         return best
 
     def _ordered(self, board: Board, depth: int, tt_move: int | None = None) -> list[int]:
@@ -275,6 +282,43 @@ def shift_mate(value: float) -> float:
         return value - 1
     if value < -WIN // 2:
         return value + 1
+    return value
+
+
+def _mate_to_tt(value: float, plies_from_root: int) -> float:
+    """Re-anchors a root-relative mate score at the node being stored.
+
+    The table outlives a single search, so a mate score must count plies from
+    the stored position itself rather than from whichever root was searching.
+
+    Args:
+        value: Score relative to the current search root.
+        plies_from_root: Plies between the search root and the stored node.
+
+    Returns:
+        The score with any mate distance measured from the node.
+    """
+    if value > WIN // 2:
+        return value + plies_from_root
+    if value < -WIN // 2:
+        return value - plies_from_root
+    return value
+
+
+def _mate_from_tt(value: float, plies_from_root: int) -> float:
+    """Inverts _mate_to_tt for a probe made from the current search root.
+
+    Args:
+        value: Node-relative score read from the transposition table.
+        plies_from_root: Plies between the search root and the probed node.
+
+    Returns:
+        The score with any mate distance measured from the search root.
+    """
+    if value > WIN // 2:
+        return value - plies_from_root
+    if value < -WIN // 2:
+        return value + plies_from_root
     return value
 
 

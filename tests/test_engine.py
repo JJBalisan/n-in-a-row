@@ -1,5 +1,7 @@
 """Stdlib-only tests:  python3 -m unittest discover -s tests"""
 
+import contextlib
+import io
 import os
 import random
 import sys
@@ -7,6 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from tictactoe import cli
 from tictactoe.agents import load_agent
 from tictactoe.arena import play_game, play_match, replay
 from tictactoe.game import DRAW, Board, InvalidMove, O, X, windows
@@ -129,6 +132,39 @@ class TestSearch(unittest.TestCase):
         self.assertFalse(r.exact)
         self.assertIsNotNone(r.move)
 
+    def test_warm_table_keeps_mate_distance(self):
+        """A reused engine reports the same 'win in N' as a fresh one."""
+        b = Board.from_moves([0, 4, 8, 2])
+        engine = Negamax()
+        engine.evaluate_moves(b)
+        self.assertEqual(engine.search(b).outcome, Negamax().search(b).outcome)
+        self.assertEqual(engine.search(b).outcome, "win in 2")
+
+    def test_cli_solve_headline_agrees_with_its_table(self):
+        """The solve headline matches the table row for its best move."""
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            cli.main(["solve", "--size", "3", "a1", "b2", "c3", "c1"])
+        lines = out.getvalue().splitlines()
+        headline = next(ln for ln in lines if " to move: " in ln)
+        outcome = headline.split(" to move: ", 1)[1].strip()
+        best = next(ln for ln in lines if ln.strip().startswith("best "))
+        best_label = best.split()[1]
+        rows = [ln.strip() for ln in lines if ln.startswith("  ")]
+        table = dict(r.split(None, 1) for r in rows
+                     if not r.startswith("best "))
+        self.assertEqual(outcome, table[best_label])
+
+    def test_table_is_not_reused_across_k(self):
+        """Changing only k must not leak entries from the previous rules."""
+        engine = Negamax()
+        engine.evaluate_moves(Board(3, 3, 2))
+        warm = engine.evaluate_moves(Board(3, 3, 3))
+        fresh = Negamax().evaluate_moves(Board(3, 3, 3))
+        self.assertEqual(warm[8].outcome, "draw")
+        self.assertEqual({m: r.outcome for m, r in warm.items()},
+                         {m: r.outcome for m, r in fresh.items()})
+
 
 class TestAgents(unittest.TestCase):
     def test_specs_load(self):
@@ -153,10 +189,20 @@ class TestAgents(unittest.TestCase):
         self.assertEqual(res.losses, 0, "perfect play lost a game")
 
     def test_perfect_always_draws_itself(self):
-        for _ in range(6):
-            rec = play_game(load_agent("perfect", random.Random(0)),
-                            load_agent("perfect", random.Random(1)))
-            self.assertEqual(rec.winner, DRAW)
+        # perfect vs perfect is deterministic, so one game is the whole test.
+        rec = play_game(load_agent("perfect", random.Random(0)),
+                        load_agent("perfect", random.Random(1)))
+        self.assertEqual(rec.winner, DRAW)
+
+    def test_perfect_never_loses_to_noisy_perfect(self):
+        """Varied games: a noisy copy strays, and perfect must never lose."""
+        records = []
+        res = play_match(load_agent("perfect", random.Random(0)),
+                         load_agent("noisy:0.3:perfect", random.Random(3)),
+                         6, records=records)
+        self.assertEqual(res.losses, 0, "perfect lost to noisy:0.3:perfect")
+        self.assertGreater(len({tuple(r.moves) for r in records}), 1,
+                           "every game was identical")
 
 
 class TestArena(unittest.TestCase):
@@ -180,12 +226,28 @@ class TestArena(unittest.TestCase):
             self.assertEqual(steps[1][2], -value)
 
 
+def _require_numpy(test):
+    """Skips a NumPy test locally, but fails it when CI is set.
+
+    A silent skip in CI would leave env.py untested behind a green run, so any
+    non-empty CI variable (GitLab and GitHub both set CI=true) turns a missing
+    NumPy into a failure. Install the test extra: pip install -e '.[test]'.
+
+    Args:
+        test: The running unittest.TestCase.
+    """
+    try:
+        import numpy  # noqa: F401
+    except ImportError:
+        if os.environ.get("CI"):
+            test.fail("numpy is not installed but CI is set; "
+                      "install the test extra: pip install -e '.[test]'")
+        test.skipTest("numpy not installed (set CI=1 to make this a failure)")
+
+
 class TestEnv(unittest.TestCase):
     def setUp(self):
-        try:
-            import numpy  # noqa: F401
-        except ImportError:
-            self.skipTest("numpy not installed")
+        _require_numpy(self)
 
     def test_observation_is_canonical(self):
         from tictactoe.env import encode
@@ -226,15 +288,30 @@ class TestEnv(unittest.TestCase):
                                       np.zeros(10, np.float32), 2, 5)), 4)
 
     def test_symmetries_preserve_the_move(self):
+        """Each transform moves the policy target with the stone it marks."""
         import numpy as np
 
         from tictactoe.env import dihedral, encode
-        b = Board.from_moves([0, 4])
-        policy = np.zeros(9, np.float32)
-        policy[2] = 1.0
-        for obs_t, pol_t in dihedral(encode(b), policy, 3, 3):
-            self.assertEqual(pol_t.sum(), 1.0)
-            self.assertEqual(obs_t.shape, (3, 3, 3))
+        for rows, cols, moves, target, n_variants in [
+            (3, 3, [2, 3], 2, 8),        # X on c1 is the target, O on a2
+            (2, 5, [1, 7], 1, 4),        # rectangle: no transposes
+        ]:
+            b = Board.from_moves(moves, rows, cols)
+            policy = np.zeros(rows * cols, np.float32)
+            policy[target] = 1.0
+            obs = encode(b)
+            mover_plane = 0 if b.cells[target] == b.to_move else 1
+            self.assertEqual(obs[mover_plane].reshape(-1)[target], 1)
+            seen = set()
+            variants = dihedral(obs, policy, rows, cols)
+            self.assertEqual(len(variants), n_variants)
+            for obs_t, pol_t in variants:
+                self.assertEqual(pol_t.sum(), 1.0)
+                stone = obs_t[mover_plane].reshape(-1)
+                self.assertEqual(stone.sum(), 1)
+                self.assertEqual(int(np.argmax(stone)), int(np.argmax(pol_t)))
+                seen.add(int(np.argmax(pol_t)))
+            self.assertGreater(len(seen), 1, "no transform moved the target")
 
 
 if __name__ == "__main__":

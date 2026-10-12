@@ -11,6 +11,9 @@ dependencies = []
 
 [project.optional-dependencies]
 rl = ["numpy>=1.20"]
+# Everything the test suite needs. The env tests skip without NumPy locally but
+# fail when the CI environment variable is set (see README, "Tests").
+test = ["numpy>=1.20"]
 
 [project.scripts]
 tictactoe = "tictactoe.cli:main"
