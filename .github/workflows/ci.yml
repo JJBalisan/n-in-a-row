@@ -1,11 +1,22 @@
-# The unittest suite on every push and PR, with the test extra (NumPy).
+# The unittest suite on every PR and on main, with the test extra (NumPy).
 # GitHub sets CI=true, so the env tests fail instead of skipping if NumPy is
 # ever missing here. Ported from .gitlab-ci.yml when the repo moved to GitHub
 # (12 Oct 2026); based on JJBalisan/dev-toolchain's template.
 name: ci
-on: [push, pull_request]
+# A PR runs once, on its pull_request event; push runs only on main (the
+# merge), so a PR branch push and a release tag no longer run CI again on
+# a commit that already passed (dev-toolchain#7).
+on:
+  push:
+    branches: [main]
+  pull_request:
 permissions:
   contents: read
+# A newer push to a PR cancels its older run, which would otherwise queue
+# on the repo's one self-hosted runner; runs on main always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   test:
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
@@ -17,7 +28,10 @@ jobs:
       # setup-uv v10.3.0, pinned by commit: it publishes no moving major tag.
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
-          enable-cache: true
+          # Off on the self-hosted runner: there setup-uv's cache is JJ's
+          # whole ~/.cache/uv (3 GB), which it uploaded after every job and
+          # restored over the live cache. The local cache persists anyway.
+          enable-cache: ${{ !vars.CI_RUNNER }}
       - name: Format (ruff format --check)
         run: uvx ruff@0.16.10 format --check .
       - name: Lint (ruff check)
