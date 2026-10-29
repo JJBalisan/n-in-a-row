@@ -27,3 +27,6 @@ uvx ruff@0.16.10 check --output-format github .
 # step: Tests (unittest, with the test extra)
 uv sync --locked --extra test --python 3.12
 uv run --python 3.12 python -m unittest discover -s tests -v
+
+# Changelog fragments (README, "Releasing").
+python3 lib/changelog.py check
