@@ -1,15 +1,15 @@
-"""Generalised tic-tac-toe: engine, search, agents, RL environment.
+"""Generalised n-in-a-row: engine, search, agents, RL environment.
 
 The package re-exports the names most callers need.
 
 Example:
-    from tictactoe import Board, load_agent, play_game
+    from n_in_a_row import Board, load_agent, play_game
     board = Board(5, 5, k=4)          # 5x5, four in a row
 """
 
-from tictactoe import agents, arena, game, search
+from n_in_a_row import agents, arena, game, search
 
-# Public re-exports: ``from tictactoe import Board`` and friends (see README).
+# Public re-exports: ``from n_in_a_row import Board`` and friends (see README).
 Agent = agents.Agent
 FunctionAgent = agents.FunctionAgent
 GreedyAgent = agents.GreedyAgent

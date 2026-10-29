@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from typing import NamedTuple
 
-from tictactoe import game
+from n_in_a_row import game
 
 WIN = 1_000_000
 

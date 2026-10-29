@@ -7,9 +7,9 @@ to anything) in well under a minute, which makes it the better template for
 your own network: swap the NumPy MLP for a torch module and keep the pipeline.
 
     python3 examples/learn_from_solver.py --size 3
-    python3 -m tictactoe match --a examples.learn_from_solver:agent \
+    python3 -m n_in_a_row match --a examples.learn_from_solver:agent \
         --b perfect --games 100
-    python3 -m tictactoe.gui --opponent examples.learn_from_solver:agent
+    python3 -m n_in_a_row.gui --opponent examples.learn_from_solver:agent
 
 For boards too big to solve exactly, pass ``--depth 6``: the labels become the
 best moves a depth-limited search can see, which is still a strong teacher.
@@ -27,7 +27,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from examples import train_policy
-from tictactoe import agents, arena, env as rl_env, game, search
+from n_in_a_row import agents, arena, env as rl_env, game, search
 
 WEIGHTS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "solver_policy.npz"

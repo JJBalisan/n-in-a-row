@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tictactoe"
+name = "n-in-a-row"
 version = "1.0.0"
 description = "Generalised n-in-a-row: engine, search, CLI, GUI and an RL environment"
 requires-python = ">=3.9"
@@ -16,8 +16,8 @@ rl = ["numpy>=1.20"]
 test = ["numpy>=1.20"]
 
 [project.scripts]
-tictactoe = "tictactoe.cli:main"
-tictactoe-gui = "tictactoe.gui:main"
+n-in-a-row = "n_in_a_row.cli:main"
+n-in-a-row-gui = "n_in_a_row.gui:main"
 
 [tool.setuptools]
-packages = ["tictactoe"]
+packages = ["n_in_a_row"]

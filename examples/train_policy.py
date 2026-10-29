@@ -5,14 +5,14 @@ policy gradient -- not a strong method, just the shortest honest path from
 "empty board" to "an agent the CLI and the GUI will play against".
 
     python3 examples/train_policy.py --games 40000 --opponent greedy
-    python3 -m tictactoe match --a examples.train_policy:agent \
+    python3 -m n_in_a_row match --a examples.train_policy:agent \
         --b greedy --games 400
-    python3 -m tictactoe.gui --opponent examples.train_policy:agent
+    python3 -m n_in_a_row.gui --opponent examples.train_policy:agent
 
 The two things worth copying into a real PyTorch setup:
 
 * mask the illegal moves before the softmax (``obs`` and ``mask`` come straight
-  from :mod:`tictactoe.env`), and
+  from :mod:`n_in_a_row.env`), and
 * train on the canonical observation, so one network plays both colours.
 """  # noqa: E501 (the long first line doubles as the --help description)
 
@@ -26,7 +26,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tictactoe import agents, arena, env as rl_env, game
+from n_in_a_row import agents, arena, env as rl_env, game
 
 WEIGHTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "policy.npz")
 

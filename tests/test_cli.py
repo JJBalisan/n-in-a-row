@@ -17,7 +17,7 @@ _TESTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)  # so agent specs can name fake_agent
 
-from tictactoe import cli, game
+from n_in_a_row import cli, game
 
 
 def run_cli(argv):

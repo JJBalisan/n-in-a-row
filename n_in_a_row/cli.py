@@ -1,11 +1,11 @@
 """Command line front end.
 
 Example:
-    python3 -m tictactoe play --size 5 --k 4 --opponent negamax:5
-    python3 -m tictactoe match --a mynet:agent --b greedy --games 400
-    python3 -m tictactoe selfplay --games 20000 --out data.jsonl
-    python3 -m tictactoe solve --size 3
-    python3 -m tictactoe bench --size 4 --k 4
+    python3 -m n_in_a_row play --size 5 --k 4 --opponent negamax:5
+    python3 -m n_in_a_row match --a mynet:agent --b greedy --games 400
+    python3 -m n_in_a_row selfplay --games 20000 --out data.jsonl
+    python3 -m n_in_a_row solve --size 3
+    python3 -m n_in_a_row bench --size 4 --k 4
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import time
 from collections.abc import Iterable
 from typing import TextIO
 
-from tictactoe import agents, arena, game, search
+from n_in_a_row import agents, arena, game, search
 
 
 def _shape_args(p: argparse.ArgumentParser) -> None:
@@ -232,7 +232,7 @@ def cmd_selfplay(args: argparse.Namespace) -> int:
     if args.out:
         print(
             f"  wrote {args.out} -- one JSON game per line; "
-            "tictactoe.replay() turns each into"
+            "n_in_a_row.replay() turns each into"
             " (board, move, value) training triples"
         )
     return 0
@@ -335,7 +335,7 @@ def cmd_bench(args: argparse.Namespace) -> int:
         # NumPy is optional: without it the batchenv line reports a skip.
         import numpy as np  # noqa: PLC0415
 
-        from tictactoe import env as rl_env  # noqa: PLC0415
+        from n_in_a_row import env as rl_env  # noqa: PLC0415
 
         env = rl_env.BatchEnv(
             args.batch, rows, cols, k, opponent_spec=None, seed=args.seed
@@ -368,9 +368,9 @@ def build_parser() -> argparse.ArgumentParser:
         The top-level parser.
     """
     p = argparse.ArgumentParser(
-        prog="tictactoe",
+        prog="n-in-a-row",
         description=(
-            "Generalised tic-tac-toe: play it, search it, or train against it."
+            "Generalised n-in-a-row: play it, search it, or train against it."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""agent specs:

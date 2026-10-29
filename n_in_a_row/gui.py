@@ -4,8 +4,8 @@ Nothing here knows how an opponent decides anything -- it only calls
 ``select(board)``, so your network drops in exactly where 'perfect' sits.
 
 Example:
-    python3 -m tictactoe.gui --size 5 --k 4 --opponent negamax:5
-    python3 -m tictactoe.gui --opponent mynet:agent
+    python3 -m n_in_a_row.gui --size 5 --k 4 --opponent negamax:5
+    python3 -m n_in_a_row.gui --opponent mynet:agent
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ except ImportError as exc:  # pragma: no cover
         "tkinter is not available for this interpreter.\n"
         "  macOS/Homebrew:  brew install python-tk\n"
         "  Debian/Ubuntu:   sudo apt install python3-tk\n"
-        "The CLI (python3 -m tictactoe) needs no extra packages."
+        "The CLI (python3 -m n_in_a_row) needs no extra packages."
     ) from exc
 
-from tictactoe import agents, game, search
+from n_in_a_row import agents, game, search
 
 BG = "#12150F"
 GRID = "#3A4235"
@@ -107,7 +107,7 @@ class TicTacToeGUI:
         self.solver_engine = search.Negamax(max_depth=None, time_limit=2.0)
         self.hover: int | None = None
 
-        root.title("Tic-Tac-Toe")
+        root.title("n-in-a-row")
         root.configure(bg=BG)
         root.minsize(520, 620)
 
@@ -579,7 +579,7 @@ def main(argv: list[str] | None = None) -> int:
         0.
     """
     p = argparse.ArgumentParser(
-        prog="tictactoe.gui", description="Play tic-tac-toe in a window."
+        prog="n-in-a-row-gui", description="Play n-in-a-row in a window."
     )
     p.add_argument("--size", type=int, default=3, metavar="N")
     p.add_argument("--rows", type=int, default=None)

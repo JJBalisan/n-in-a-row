@@ -11,7 +11,7 @@ import importlib
 import random
 from typing import Callable
 
-from tictactoe import game, search
+from n_in_a_row import game, search
 
 
 class Agent:

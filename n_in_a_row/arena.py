@@ -7,7 +7,7 @@ import json
 import random
 from collections.abc import Callable, Iterator
 
-from tictactoe import agents, game
+from n_in_a_row import agents, game
 
 
 @dataclasses.dataclass
@@ -207,7 +207,7 @@ def selfplay(
     """Streams games between two independently seeded copies of one agent.
 
     Args:
-        agent_spec: An agent spec, as :func:`tictactoe.agents.load_agent`
+        agent_spec: An agent spec, as :func:`n_in_a_row.agents.load_agent`
             reads it.
         games: Number of games.
         rows: Board height.
