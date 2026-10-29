@@ -18,7 +18,7 @@ import time
 from collections.abc import Iterable
 from typing import TextIO
 
-from n_in_a_row import agents, arena, game, search
+from n_in_a_row import agents, arena, game, search, version
 
 
 def _shape_args(p: argparse.ArgumentParser) -> None:
@@ -382,6 +382,11 @@ def build_parser() -> argparse.ArgumentParser:
   noisy:0.2:perfect     any agent, played at random 20%% of the time
   mymodule:factory      your own -- an Agent, an Agent subclass, or a factory
 """,
+    )
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {version.repo_version()}",
     )
     sub = p.add_subparsers(dest="command", required=True)
 

@@ -28,7 +28,7 @@ except ImportError as exc:  # pragma: no cover
         "The CLI (python3 -m n_in_a_row) needs no extra packages."
     ) from exc
 
-from n_in_a_row import agents, game, search
+from n_in_a_row import agents, game, search, version
 
 BG = "#12150F"
 GRID = "#3A4235"
@@ -580,6 +580,11 @@ def main(argv: list[str] | None = None) -> int:
     """
     p = argparse.ArgumentParser(
         prog="n-in-a-row-gui", description="Play n-in-a-row in a window."
+    )
+    p.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {version.repo_version()}",
     )
     p.add_argument("--size", type=int, default=3, metavar="N")
     p.add_argument("--rows", type=int, default=None)

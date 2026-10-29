@@ -132,7 +132,7 @@ plugging themselves back into the CLI.
 MLP by asking it for the optimal moves in every position. On 3×3 it reaches
 perfect play in about 25 seconds:
 
-```
+```text
 distilled vs random  over 200 games: 187-13-0  (W-D-L), score 0.968
 distilled vs greedy  over 200 games:   0-200-0 (W-D-L), score 0.500
 distilled vs perfect over  50 games:   0-50-0  (W-D-L), score 0.500
@@ -173,7 +173,7 @@ a value is game-theoretic or a heuristic estimate.
 
 ## Layout
 
-```
+```text
 n_in_a_row/
   game.py      Board: shape, moves, undo stack, Zobrist hash, win detection, text I/O
   search.py    Negamax: alpha-beta, TT, iterative deepening, threat heuristic
@@ -204,6 +204,37 @@ without failing yet, then installs the test extra and runs the suite.
 Tests marked `@unittest.expectedFailure` pin known, not-yet-fixed defects (their
 docstrings say which); the run stays green while they fail and goes red once a
 fix makes one pass, so remove the decorator with the fix.
+
+## Releasing
+
+Every release is an annotated tag `vX.Y.Z` on `main`, recorded in
+[`CHANGELOG.md`](CHANGELOG.md); `n-in-a-row --version` (and
+`n-in-a-row-gui --version`) prints what git says about the checkout it
+runs from: `v1.0.0-0-g<sha>` on a release, `v1.0.0-3-g<sha>` three commits
+past it, `-dirty` with local edits.
+
+Each MAJOR version also has a codename, the same for all of its MINOR and
+PATCH releases. It goes in the `.0.0` tag's message and every release
+title on GitHub (`v1.0.0 — <codename>`), never in the version number.
+
+1. Between releases, each change adds `changes/<number>-<slug>.md`
+   (`python3 lib/changelog.py new <slug>`; see
+   [`changes/README.md`](changes/README.md)) rather than editing
+   `[Unreleased]`.
+2. On a branch, `python3 lib/changelog.py release X.Y.Z` folds the
+   fragments into a new `[X.Y.Z] - date` section and rewrites the compare
+   links; set the same version in `pyproject.toml` and run
+   `/opt/homebrew/bin/uv lock`. Open that as the release PR.
+3. Merge to `main`, pull, then tag the merge commit, push the tag and
+   publish the GitHub release:
+
+   ```bash
+   git tag -a vX.Y.Z -m "vX.Y.Z — <codename>" && git push origin vX.Y.Z
+   gh release create vX.Y.Z --title "vX.Y.Z — <codename>" --notes-from-tag
+   ```
+
+MAJOR when the public API breaks (`game`, `search`, `agents`, `arena`,
+`env`, an agent spec or a CLI flag), MINOR when it grows, PATCH for a fix.
 
 ## Interpreters on this machine
 

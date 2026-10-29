@@ -12,7 +12,10 @@ repos:
     rev: v0.45.0
     hooks:
       - id: markdownlint
-        args: [--disable, MD013, --]   # line length handled by editorconfig
+        args: [--disable, MD013, --]   # line length handled by editorconfig; other rules in .markdownlint.yaml
+        # changes/ fragments start at "### Added" by design (MD041 wants "#");
+        # changelog.py check guards their shape. changes/README.md is linted.
+        exclude: '^changes/(?!README\.md$)'
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
