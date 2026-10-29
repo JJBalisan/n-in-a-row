@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)  # so load_agent can import fake_agent
 
 import fake_agent
-from tictactoe import agents, game
+from n_in_a_row import agents, game
 
 
 class TestLoadAgentModuleAttribute(unittest.TestCase):

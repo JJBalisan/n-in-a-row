@@ -1,4 +1,4 @@
-# tictactoe
+# n-in-a-row
 
 Generalised n-in-a-row: any board size, any run length, one engine underneath a
 terminal front end, a windowed front end, and a reinforcement-learning
@@ -8,9 +8,9 @@ Three layers, deliberately separated:
 
 | layer | module | needs |
 |---|---|---|
-| engine, search, agents, arena | `tictactoe.game`, `.search`, `.agents`, `.arena` | nothing — standard library only |
-| terminal + window | `tictactoe.cli`, `tictactoe.gui` | the above (plus `tkinter` for the GUI) |
-| RL environment | `tictactoe.env` | NumPy |
+| engine, search, agents, arena | `n_in_a_row.game`, `.search`, `.agents`, `.arena` | nothing — standard library only |
+| terminal + window | `n_in_a_row.cli`, `n_in_a_row.gui` | the above (plus `tkinter` for the GUI) |
+| RL environment | `n_in_a_row.env` | NumPy |
 
 The GUI and the CLI both call `agent.select(board)` and nothing else, so
 anything you train drops into either one without changes.
@@ -18,10 +18,10 @@ anything you train drops into either one without changes.
 ## Quick start
 
 ```bash
-cd tictactoe
-python3 -m tictactoe play --size 5 -k 4 --opponent negamax:5   # play in the terminal
-python3 -m tictactoe.gui --size 5 -k 4 --opponent negamax:5    # play in a window
-python3 -m unittest discover -s tests                          # stdlib only; see Tests
+cd n-in-a-row
+python3 -m n_in_a_row play --size 5 -k 4 --opponent negamax:5   # play in the terminal
+python3 -m n_in_a_row.gui --size 5 -k 4 --opponent negamax:5    # play in a window
+python3 -m unittest discover -s tests                           # stdlib only; see Tests
 ```
 
 Board shape is `--size N` for N×N, or `--rows R --cols C` for a rectangle;
@@ -52,7 +52,7 @@ punishes real mistakes while still losing when it should.
 Implement one method:
 
 ```python
-from tictactoe import Agent
+from n_in_a_row import Agent
 
 
 class MyNet(Agent):
@@ -72,8 +72,8 @@ def agent():  # the factory the CLI imports
 Then everything works:
 
 ```bash
-python3 -m tictactoe match --a mymodule:agent --b greedy --games 400
-python3 -m tictactoe.gui --opponent mymodule:agent
+python3 -m n_in_a_row match --a mymodule:agent --b greedy --games 400
+python3 -m n_in_a_row.gui --opponent mymodule:agent
 ```
 
 `module:attribute` may resolve to an `Agent` instance, an `Agent` subclass, or a
@@ -82,8 +82,8 @@ zero-argument factory returning either.
 ## The RL environment
 
 ```python
-from tictactoe.env import TicTacToeEnv
-from tictactoe.agents import load_agent
+from n_in_a_row.env import TicTacToeEnv
+from n_in_a_row.agents import load_agent
 
 env = TicTacToeEnv(
     rows=5,
@@ -110,16 +110,16 @@ obs, reward, done, info = env.step(action)  # reward is the mover's: +1 / 0 / -1
 - **`BatchEnv(n, ...)`** runs a bank of games in lockstep so one forward pass
   becomes `n` moves. Finished games reset themselves and alternate colours.
 
-Throughput on this machine (`python3 -m tictactoe bench`): ~100k engine
+Throughput on this machine (`python3 -m n_in_a_row bench`): ~100k engine
 moves/s, ~25k batched env moves/s, ~20k search nodes/s on a 4×4.
 
 ## Training data from the engine
 
 ```bash
-python3 -m tictactoe selfplay --games 20000 --agent noisy:0.25:perfect --out data.jsonl
+python3 -m n_in_a_row selfplay --games 20000 --agent noisy:0.25:perfect --out data.jsonl
 ```
 
-One JSON game per line. `tictactoe.replay(record)` turns each into
+One JSON game per line. `n_in_a_row.replay(record)` turns each into
 `(board, move, value)` triples where `value` is the final result from the side
 to move — the target a value head wants.
 
@@ -150,8 +150,8 @@ search is simply not a strong method here. Included because it shows the
 
 ```bash
 python3 examples/learn_from_solver.py --size 3
-python3 -m tictactoe match --a examples.learn_from_solver:agent --b perfect --games 100
-python3 -m tictactoe.gui --opponent examples.learn_from_solver:agent
+python3 -m n_in_a_row match --a examples.learn_from_solver:agent --b perfect --games 100
+python3 -m n_in_a_row.gui --opponent examples.learn_from_solver:agent
 ```
 
 ## The search engine
@@ -162,8 +162,8 @@ existing stones, then centre). Mate scores count plies from the current
 position, so `solve` reports "win in 2" meaning two of your own moves from here.
 
 ```bash
-python3 -m tictactoe solve --size 3               # every opening draws
-python3 -m tictactoe solve --size 3 a1 a2 b1      # O to move: loss in 2
+python3 -m n_in_a_row solve --size 3               # every opening draws
+python3 -m n_in_a_row solve --size 3 a1 a2 b1      # O to move: loss in 2
 ```
 
 Exact search is capped at 14 empty cells (`SOFT_EXACT_LIMIT`); beyond that it
@@ -174,7 +174,7 @@ a value is game-theoretic or a heuristic estimate.
 ## Layout
 
 ```
-tictactoe/
+n_in_a_row/
   game.py      Board: shape, moves, undo stack, Zobrist hash, win detection, text I/O
   search.py    Negamax: alpha-beta, TT, iterative deepening, threat heuristic
   agents.py    Agent protocol, built-in agents, load_agent() spec parser
@@ -210,5 +210,5 @@ fix makes one pass, so remove the decorator with the fix.
 - `/usr/bin/python3` and Anaconda's `python3` have `tkinter` and NumPy — the
   GUI and the RL layer both work.
 - Homebrew's `python3` (3.14, arm64) has neither out of the box:
-  `brew install python-tk` for the GUI, `pip install numpy` for `tictactoe.env`.
+  `brew install python-tk` for the GUI, `pip install numpy` for `n_in_a_row.env`.
 - The CLI, the engine and the tests need none of that and run on any of them.

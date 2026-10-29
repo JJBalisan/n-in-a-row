@@ -12,7 +12,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from tictactoe import agents, game
+from n_in_a_row import agents, game
 
 #: (own stones, opponent stones, side-to-move) -- the third plane is constant
 #: over the board and matters on sizes where moving first is a real edge.

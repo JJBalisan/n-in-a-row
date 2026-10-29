@@ -20,7 +20,7 @@ _TESTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)  # so agent specs can name fake_agent
 
-from tictactoe import arena, cli, game, search
+from n_in_a_row import arena, cli, game, search
 
 
 def run_cli(argv, stdin=''):
@@ -262,16 +262,16 @@ class TestRendering(unittest.TestCase):
 
 
 def _import_gui(test):
-    """Imports tictactoe.gui, skipping when tkinter is unavailable.
+    """Imports n_in_a_row.gui, skipping when tkinter is unavailable.
 
     Args:
         test: The running unittest.TestCase.
 
     Returns:
-        The tictactoe.gui module.
+        The n_in_a_row.gui module.
     """
     try:
-        from tictactoe import gui
+        from n_in_a_row import gui
     except (ImportError, SystemExit):
         test.skipTest('tkinter is not available')
     return gui

@@ -50,7 +50,7 @@ ignore = [
 convention = "google"
 
 [lint.isort]
-known-first-party = ["tictactoe", "examples", "fake_agent"]
+known-first-party = ["n_in_a_row", "examples", "fake_agent"]
 combine-as-imports = true
 
 [lint.flake8-tidy-imports]
@@ -65,4 +65,4 @@ max-statements = 50      # ~ pyguide 3.18 "about 40 lines"
 "tests/**" = ["D", "ANN", "S101", "PLR", "ARG", "E402", "PLC0415"]
 # N803/N806: the NumPy code keeps matrix notation (X, W1, dW2, H).
 "examples/**" = ["T20", "D", "E402", "N803", "N806"]
-"tictactoe/cli.py" = ["T20"]   # printing is the command line's job
+"n_in_a_row/cli.py" = ["T20"]   # printing is the command line's job

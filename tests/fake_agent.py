@@ -11,7 +11,7 @@ Each attribute is one of the shapes load_agent accepts (or must reject):
     fake_agent:Interrupts     an agent whose select() acts like Ctrl-C
 """
 
-from tictactoe import agents
+from n_in_a_row import agents
 
 
 class FirstLegal(agents.Agent):

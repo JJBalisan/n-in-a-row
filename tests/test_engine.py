@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tictactoe import agents, arena, cli, game, search
+from n_in_a_row import agents, arena, cli, game, search
 
 
 class TestBoard(unittest.TestCase):
@@ -276,7 +276,7 @@ class TestEnv(unittest.TestCase):
         _require_numpy(self)
 
     def test_observation_is_canonical(self):
-        from tictactoe import env as rl_env
+        from n_in_a_row import env as rl_env
 
         b = game.Board.from_moves([4])  # X centre, O to move
         obs = rl_env.encode(b)
@@ -286,7 +286,7 @@ class TestEnv(unittest.TestCase):
         self.assertEqual(obs[2][0, 0], 0)  # side-to-move plane is O
 
     def test_step_reward_belongs_to_the_mover(self):
-        from tictactoe import env as rl_env
+        from n_in_a_row import env as rl_env
 
         env = rl_env.TicTacToeEnv(3)
         env.reset()
@@ -298,7 +298,7 @@ class TestEnv(unittest.TestCase):
         self.assertEqual(r, 1.0)
 
     def test_illegal_move_can_forfeit(self):
-        from tictactoe import env as rl_env
+        from n_in_a_row import env as rl_env
 
         env = rl_env.TicTacToeEnv(3, illegal_move="lose")
         env.reset()
@@ -310,7 +310,7 @@ class TestEnv(unittest.TestCase):
     def test_symmetry_counts(self):
         import numpy as np
 
-        from tictactoe import env as rl_env
+        from n_in_a_row import env as rl_env
 
         self.assertEqual(
             len(
@@ -339,7 +339,7 @@ class TestEnv(unittest.TestCase):
         """Each transform moves the policy target with the stone it marks."""
         import numpy as np
 
-        from tictactoe import env as rl_env
+        from n_in_a_row import env as rl_env
 
         for rows, cols, moves, target, n_variants in [
             (3, 3, [2, 3], 2, 8),  # X on c1 is the target, O on a2

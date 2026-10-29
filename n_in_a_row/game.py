@@ -2,7 +2,7 @@
 
 Pure standard library on purpose: the CLI and the GUI import only this module
 tree, so they run on any Python 3.9+ with nothing installed.  NumPy appears
-exclusively in :mod:`tictactoe.env`, the reinforcement-learning layer.
+exclusively in :mod:`n_in_a_row.env`, the reinforcement-learning layer.
 """
 
 from __future__ import annotations

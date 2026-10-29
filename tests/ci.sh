@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# CI for wt-tictactoe, drafted 2026-10-26 by dev-toolchain's ci/gen_ci_sh.py
+# CI for n-in-a-row, drafted 2026-10-26 by dev-toolchain's ci/gen_ci_sh.py
 # from ci.yml.
 # Review it, then make the workflow's one step `bash tests/ci.sh`; from then
 # on edit this file, not the workflow.
