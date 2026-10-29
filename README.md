@@ -214,8 +214,13 @@ runs from: `v1.0.0-0-g<sha>` on a release, `v1.0.0-3-g<sha>` three commits
 past it, `-dirty` with local edits.
 
 Each MAJOR version also has a codename, the same for all of its MINOR and
-PATCH releases. It goes in the `.0.0` tag's message and every release
-title on GitHub (`v1.0.0 — <codename>`), never in the version number.
+PATCH releases: a county of Kenya, a new one per MAJOR. It goes in the
+`.0.0` tag's message and every release title on GitHub (`v1.0.0 — Lamu`),
+never in the version number.
+
+| MAJOR | Codename |
+| --- | --- |
+| 1 | Lamu |
 
 1. Between releases, each change adds `changes/<number>-<slug>.md`
    (`python3 lib/changelog.py new <slug>`; see
