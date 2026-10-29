@@ -23,8 +23,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - name: CI (the same script runs locally)
-        run: bash tests/ci.sh
       # setup-uv v10.3.0, pinned by commit: it publishes no moving major tag.
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
@@ -32,6 +30,8 @@ jobs:
           # whole ~/.cache/uv (3 GB), which it uploaded after every job and
           # restored over the live cache. The local cache persists anyway.
           enable-cache: ${{ !vars.CI_RUNNER }}
+      - name: CI (the same script runs locally)
+        run: bash tests/ci.sh
       - name: Format (ruff format --check)
         run: uvx ruff@0.16.10 format --check .
       - name: Lint (ruff check)
