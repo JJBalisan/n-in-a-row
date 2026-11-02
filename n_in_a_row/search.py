@@ -242,8 +242,13 @@ class Negamax:
         tt_move = None
         if hit is not None:
             h_depth, flag, value, tt_move = hit
+            # A deeper search may have stored a mate beyond this node's
+            # horizon. Trusting it would let a shallow iteration stop on that
+            # slower mate before a deeper one finds the fastest, so such an
+            # entry only orders moves. Its plies count from this node.
+            far_mate = WIN // 2 < abs(value) < WIN - depth
             value = _mate_from_tt(value, board.ply - self._root_ply)
-            if h_depth >= depth:
+            if h_depth >= depth and not far_mate:
                 if flag == EXACT:
                     return value
                 if flag == LOWER and value > alpha:
