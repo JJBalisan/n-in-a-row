@@ -26,32 +26,14 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from n_in_a_row import agents, arena, env as rl_env, game
+from n_in_a_row import agents, arena, env as rl_env
+from n_in_a_row.harness import trainer
 
 WEIGHTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "policy.npz")
 
 
-class Policy:
-    """One hidden layer. Small enough to read, big enough to solve 3x3."""
-
-    def __init__(
-        self, n_in: int, n_hidden: int, n_out: int, rng: np.random.Generator
-    ) -> None:
-        self.W1 = rng.normal(0, np.sqrt(2.0 / n_in), (n_in, n_hidden))
-        self.b1 = np.zeros(n_hidden)
-        self.W2 = rng.normal(0, np.sqrt(1.0 / n_hidden), (n_hidden, n_out))
-        self.b2 = np.zeros(n_out)
-
-    def logits(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        h = np.tanh(x @ self.W1 + self.b1)
-        return h, h @ self.W2 + self.b2
-
-    def probs(self, x: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        _, z = self.logits(x)
-        z = np.where(mask, z, -1e9)
-        z -= z.max(axis=-1, keepdims=True)
-        e = np.exp(z) * mask
-        return e / np.maximum(e.sum(axis=-1, keepdims=True), 1e-12)
+class Policy(trainer.Policy):
+    """One hidden layer, plus the REINFORCE update this example trains with."""
 
     def step(
         self,
@@ -93,16 +75,6 @@ class Policy:
         self.b2 += lr * db2
         self.W1 += lr * dW1
         self.b1 += lr * db1
-
-    def save(self, path: str) -> None:
-        np.savez(path, W1=self.W1, b1=self.b1, W2=self.W2, b2=self.b2)
-
-    @classmethod
-    def load(cls, path: str) -> Policy:
-        d = np.load(path)
-        p = cls.__new__(cls)
-        p.W1, p.b1, p.W2, p.b2 = d["W1"], d["b1"], d["W2"], d["b2"]
-        return p
 
 
 def rollout(
@@ -212,26 +184,7 @@ def evaluate(
     return res.summary("policy", them.name)
 
 
-class PolicyAgent(agents.Agent):
-    """The trained net, wearing the Agent interface everything else expects."""
-
-    name = "policy"
-
-    def __init__(
-        self, policy: Policy, greedy: bool = True, seed: int = 0
-    ) -> None:
-        self.policy = policy
-        self.greedy = greedy
-        self.rng = np.random.default_rng(seed)
-
-    def select(self, board: game.Board) -> int:
-
-        x = rl_env.encode(board).reshape(1, -1).astype(np.float64)
-        m = rl_env.legal_mask(board)[None, :]
-        p = self.policy.probs(x, m)[0]
-        if self.greedy:
-            return int(np.argmax(p))
-        return int(self.rng.choice(len(p), p=p))
+PolicyAgent = trainer.PolicyAgent
 
 
 def agent() -> PolicyAgent:
