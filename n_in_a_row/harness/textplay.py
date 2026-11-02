@@ -25,7 +25,8 @@ OK, UNPARSEABLE, OFF_BOARD, OCCUPIED = (
     "occupied",
 )
 
-_MOVE_LINE = re.compile(r"move\s*:\s*([^\n]*)", re.IGNORECASE)
+_MOVE_LINE = re.compile(r"\bmove\s*:\s*([^\n]*)", re.IGNORECASE)
+_LEAD_CELL = re.compile(r"[a-z]+\d+|\d+\s*[,;x]\s*\d+|\d+", re.IGNORECASE)
 _CELL_WORD = re.compile(r"\b[a-z]+\d+\b")
 _CELL_SHAPE = re.compile(r"[a-z]+\d+|\d+[,;x]\d+|\d+")
 _TRIM = " \t.,;:!?`*'\"()[]"
@@ -109,7 +110,9 @@ def _extract(reply: str, strict: bool) -> str | None:
         return reply.strip()
     lines = _MOVE_LINE.findall(reply)
     if lines:
-        return lines[-1].strip(_TRIM)
+        line = lines[-1].strip(_TRIM)
+        lead = _LEAD_CELL.match(line)
+        return lead.group() if lead else line
     whole = reply.strip().strip(_TRIM)
     if _CELL_SHAPE.fullmatch(whole.lower().replace(" ", "")):
         return whole
@@ -124,11 +127,12 @@ def parse_reply(
 ) -> ReplyResult:
     """Reads a model's reply as a move in a position.
 
-    The move is taken from the last ``MOVE:`` line if there is one, else
-    from the whole reply if it is just a cell, else from the one cell name
-    (such as ``b2``) the prose mentions; two different cell names are
-    unparseable. Cells are read with ``Board.parse_move``, so ``b2``,
-    ``2,2`` and the bare index ``4`` all work.
+    The move is the first cell on the last ``MOVE:`` line if there is one
+    (so ``MOVE: b2 (centre)`` is b2), else the whole reply if it is just a
+    cell, else the one cell name (such as ``b2``) the prose mentions; two
+    different cell names are unparseable. Cells are read with
+    ``Board.parse_move``, so ``b2``, ``2,2`` and the bare index ``4`` all
+    work.
 
     Args:
         board: The position the reply is about.
@@ -189,7 +193,12 @@ class TextAgent(agents.Agent):
             fallback: Plays when every attempt failed; None raises.
             strict: Read only whole replies as cells.
             name: The agent's label.
+
+        Raises:
+            ValueError: If retries is negative.
         """
+        if retries < 0:
+            raise ValueError(f"retries must be at least 0, not {retries}")
         self.model = model
         self.retries = retries
         self.fallback = fallback

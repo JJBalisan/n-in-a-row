@@ -130,14 +130,17 @@ def power(
 
     Returns:
         The chance of detecting the difference (the far tail is ignored).
+        With both rates 0 or 1 nothing varies, so it is 1.0 or 0.0.
     """
     p_bar = (p1 + p2) / 2.0
     z_a = _z_alpha(alpha, two_sided)
-    z_b = (
-        math.sqrt(n) * abs(p1 - p2)
-        - z_a * math.sqrt(2.0 * p_bar * (1.0 - p_bar))
-    ) / math.sqrt(p1 * (1.0 - p1) + p2 * (1.0 - p2))
-    return _NORMAL.cdf(z_b)
+    shift = math.sqrt(n) * abs(p1 - p2) - z_a * math.sqrt(
+        2.0 * p_bar * (1.0 - p_bar)
+    )
+    spread = math.sqrt(p1 * (1.0 - p1) + p2 * (1.0 - p2))
+    if spread == 0.0:
+        return 1.0 if shift > 0.0 else 0.0
+    return _NORMAL.cdf(shift / spread)
 
 
 class CusumResult(NamedTuple):

@@ -9,7 +9,10 @@ took about 200 s in the pilots), so a labeller can keep its labels in an
 SQLite file keyed by the rules and ``Board.hash``. The hash is seeded from the
 board shape, so it is the same in every process; each row also stores the
 cells and is ignored if they differ, so a hash collision costs a search
-rather than a wrong label.
+rather than a wrong label. The file is stamped with ``CACHE_VERSION``
+(SQLite's ``user_version``) and a file with another stamp is refused, so
+labels from an older engine are never read back as current; bump it with
+any change that could alter a label.
 
 Each position gets a fresh engine, so a label never depends on which
 positions were labelled before it. Before #12 a transposition table kept
@@ -28,6 +31,11 @@ from n_in_a_row import game, search
 
 _MATE = search.WIN // 2
 
+#: The label cache format and engine; files with another stamp are refused.
+#: Unstamped files (0) were written by v1.1.0, whose labels are exact, and
+#: are adopted.
+CACHE_VERSION = 1
+
 
 class LabelError(ValueError):
     """Raised for a position too large to label exactly."""
@@ -35,6 +43,10 @@ class LabelError(ValueError):
 
 class InexactError(RuntimeError):
     """Raised when the engine returns a result it does not prove exact."""
+
+
+class CacheVersionError(RuntimeError):
+    """Raised for a label cache stamped with another ``CACHE_VERSION``."""
 
 
 class MoveLabel(NamedTuple):
@@ -102,6 +114,9 @@ class ExactLabeller:
                 tests; None (the default) searches each position with a
                 fresh ``Negamax(max_depth=None)``, which keeps mate
                 distances exact.
+
+        Raises:
+            CacheVersionError: If the cache file has another version stamp.
         """
         self.engine = engine
         self.hits = 0
@@ -110,6 +125,13 @@ class ExactLabeller:
         self._db: sqlite3.Connection | None = None
         if cache_path is not None:
             self._db = sqlite3.connect(cache_path)
+            stamp = self._db.execute("PRAGMA user_version").fetchone()[0]
+            if stamp not in (0, CACHE_VERSION):
+                self.close()
+                raise CacheVersionError(
+                    f"{cache_path} holds version {stamp} labels, this is "
+                    f"version {CACHE_VERSION}: delete it or use a new path"
+                )
             # WAL commits without an fsync each, and a crash loses only the
             # newest labels; every one is worth a search, so commit each.
             self._db.execute("PRAGMA journal_mode=WAL")
@@ -120,6 +142,7 @@ class ExactLabeller:
                 "cells TEXT, moves TEXT, "
                 "PRIMARY KEY (rows, cols, k, hash))"
             )
+            self._db.execute(f"PRAGMA user_version = {CACHE_VERSION}")
             self._db.commit()
 
     def __enter__(self) -> ExactLabeller:
