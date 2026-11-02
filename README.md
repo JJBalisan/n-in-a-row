@@ -194,8 +194,9 @@ with labels.ExactLabeller("labels.sqlite") as oracle:
 Exact labels are cheap on 4x4 with 3 in a row (0.03-0.16 s a position)
 and expensive on drawn boards (about 200 s for one 4x4, 4-in-a-row
 position with 14 empty cells), hence the cache. Each position gets a fresh
-engine: a transposition table kept warm across positions proves the same
-results but misreported the mate distance in 20 tic-tac-toe positions.
+engine, so a label never depends on which positions came before it; every
+tic-tac-toe label is checked against brute-force minimax, mate distance
+included.
 
 Zoo agents have specs of their own, read by `zoo.load` (anything else goes
 to `load_agent`), and zero-argument factories that work as

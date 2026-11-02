@@ -11,11 +11,11 @@ board shape, so it is the same in every process; each row also stores the
 cells and is ignored if they differ, so a hash collision costs a search
 rather than a wrong label.
 
-Each position gets a fresh engine. A transposition table kept warm across
-positions proves the same outcomes but not always the same mate distances:
-on tic-tac-toe a warm engine misreported the distance in 20 of the 4,520
-non-terminal positions, a fresh one in none (checked against brute-force
-minimax).
+Each position gets a fresh engine, so a label never depends on which
+positions were labelled before it. Before #12 a transposition table kept
+warm across positions misreported the mate distance in 20 of the 4,520
+tic-tac-toe positions; the tests check every label against brute-force
+minimax.
 """
 
 from __future__ import annotations

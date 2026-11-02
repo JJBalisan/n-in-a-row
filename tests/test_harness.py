@@ -125,7 +125,7 @@ class TestExactLabeller(unittest.TestCase):
             labeller.label(game.Board())
 
     def test_values_match_brute_force_minimax(self):
-        # Mate distance included: a warm engine got 20 of these wrong.
+        # Mate distance included: before #12 a warm engine got 20 wrong.
         for b, lab in zip(LIVE, LABELS):
             self.assertEqual(
                 {m: x.value for m, x in lab.items()}, _brute_force(b), b
