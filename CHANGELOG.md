@@ -12,6 +12,14 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-11-02
+
+### Fixed
+
+- The README and the `zoo` docstrings describe the stealth saboteur as it
+  behaves since v1.1.1: it throws blunders the monitor does not flag,
+  scored at or under the threshold (#16).
+
 ## [1.1.1] - 2026-11-02
 
 ### Fixed
@@ -84,7 +92,8 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.1...v1.0.2
