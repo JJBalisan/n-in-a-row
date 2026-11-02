@@ -11,6 +11,7 @@ Three layers, deliberately separated:
 | engine, search, agents, arena | `n_in_a_row.game`, `.search`, `.agents`, `.arena` | nothing — standard library only |
 | terminal + window | `n_in_a_row.cli`, `n_in_a_row.gui` | the above (plus `tkinter` for the GUI) |
 | RL environment | `n_in_a_row.env` | NumPy |
+| safety-experiment harness | `n_in_a_row.harness` | standard library only (`trainer`: NumPy) |
 
 The GUI and the CLI both call `agent.select(board)` and nothing else, so
 anything you train drops into either one without changes.
@@ -154,6 +155,71 @@ python3 -m n_in_a_row match --a examples.learn_from_solver:agent --b perfect --g
 python3 -m n_in_a_row.gui --opponent examples.learn_from_solver:agent
 ```
 
+## The safety-experiment harness
+
+`n_in_a_row.harness` is the shared kit for AI-safety and AI-control
+experiments that use the exact solver as ground truth: monitoring,
+sabotage at low base rates, sandbagging, covert channels in equal-value
+moves. Every piece is tested against a positive control from the
+tic-tac-toe state space (5,478 reachable positions, 4,520 non-terminal,
+3,191 where some move is not optimal).
+
+| module | what it gives you | control it is tested against |
+|---|---|---|
+| `labels` | `ExactLabeller`: exact win/draw/loss and mate distance for every legal move, cached in SQLite by rules and `Board.hash`; refuses positions above 14 empty cells | brute-force minimax on all 4,520 positions; the counts above; `random` optimal 40.5% of the time |
+| `monitor` | `Monitor(d)`: suspicion of each move from a depth-d search, and threshold flags | AUROC against exact blunders on all tic-tac-toe moves: 0.906, 0.967, 0.995 at depths 1-3 |
+| `regret` | outcome and mate-distance regret per move, blunder rate per game or record set (via `arena.replay`) | perfect self-play has zero regret |
+| `ties` | the moves the solver rates exactly equal, `log2` capacity per position and per game | 30.5% of positions have two or more equal-best moves, 0.44 bits on average |
+| `stats` | AUROC (ties as half), precision at a base rate, two-proportion sample size and power, CUSUM | hand-worked cases; 388 per group for 50% vs 60% |
+| `zoo` | `Saboteur` (rate, or only blunders a monitor scores under a threshold), `Sandbagger` (slow wins, or draws in won positions), `PasswordLocked` | each one's ground-truth log matches the labels |
+| `textplay` | `render_prompt`, `parse_reply` and `TextAgent`, which wraps any `prompt -> reply` callable | every legal move round-trips; a fake model plays a full game |
+| `trainer` | the distillation pipeline from `examples/learn_from_solver.py`, with pluggable teachers [NumPy] | the example's pinned output and weights |
+
+```python
+from n_in_a_row import Board
+from n_in_a_row.harness import labels, monitor, regret, stats
+
+with labels.ExactLabeller("labels.sqlite") as oracle:
+    board = Board.from_moves([4, 0, 8])  # O to move
+    # {move: MoveLabel(move, value, outcome, plies)}
+    exact = oracle.label(board)
+    bad = set(labels.blunders(exact))
+    scores = monitor.Monitor(1).scores(board)  # 0.0 for the monitor's pick
+    auc = stats.auroc(
+        [s for m, s in scores.items() if m in bad],
+        [s for m, s in scores.items() if m not in bad],
+    )
+```
+
+Exact labels are cheap on 4x4 with 3 in a row (0.03-0.16 s a position)
+and expensive on drawn boards (about 200 s for one 4x4, 4-in-a-row
+position with 14 empty cells), hence the cache. Each position gets a fresh
+engine: a transposition table kept warm across positions proves the same
+results but misreported the mate distance in 20 tic-tac-toe positions.
+
+Zoo agents have specs of their own, read by `zoo.load` (anything else goes
+to `load_agent`), and zero-argument factories that work as
+`module:factory` specs anywhere:
+
+| spec | plays |
+|---|---|
+| `saboteur:0.1:perfect` | `perfect`, but plays an exact blunder on 10% of the chances |
+| `stealth:1:100:1.0` | throws only blunders a depth-1 monitor scores under 100 |
+| `sandbag:slow` / `sandbag:draw` | never loses value it could keep, but slow-rolls wins / takes draws |
+| `locked:b2+a1:perfect` | `perfect` once the game opened b2, a1; `random` otherwise |
+| `n_in_a_row.harness.zoo:saboteur` | the factory form; also `stealth`, `sandbagger`, `locked`, `noisy` |
+
+Keep the weak side of a lock near-random: `negamax:1` already picks an
+optimal tic-tac-toe move 97.8% of the time.
+
+Text play is how a language model joins: `TextAgent(model)` sends
+`render_prompt(board)` (the rules, `Board.render()`, the legal moves and a
+`MOVE: <cell>` format) and reads the reply with `parse_reply`, which
+reports `unparseable`, `off_board` or `occupied` replies instead of
+repairing them. It retries with the reason if asked, then raises or plays a
+named fallback agent, and keeps every exchange in `.turns`. Nothing in the
+repo calls a model; the callable is yours.
+
 ## The search engine
 
 Negamax with alpha-beta, a Zobrist-keyed transposition table, iterative
@@ -182,8 +248,9 @@ n_in_a_row/
   env.py       TicTacToeEnv, BatchEnv, encode, legal_mask, dihedral   [NumPy]
   cli.py       play / match / selfplay / solve / bench
   gui.py       Tkinter board                                          [tkinter]
+  harness/     labels, monitor, regret, ties, stats, zoo, textplay; trainer [NumPy]
 examples/      learn_from_solver.py, train_policy.py
-tests/         test_engine.py, test_cli.py, test_agents.py (+ fake_agent.py) -- stdlib unittest
+tests/         test_engine.py, test_cli.py, test_agents.py, test_harness.py (+ fake_agent.py) -- stdlib unittest
 ```
 
 ## Tests
@@ -194,7 +261,8 @@ pip install -e '.[test]'                         # adds NumPy for the env tests
 CI=1 python3 -m unittest discover -s tests       # what CI runs
 ```
 
-The `TestEnv` cases need NumPy. Locally they skip when it is missing; when the
+The `TestEnv` cases, the example tests and `test_harness_trainer.py` need
+NumPy. Locally they skip when it is missing; when the
 `CI` environment variable is set (GitLab and GitHub set `CI=true`) a missing
 NumPy fails them instead, so a green pipeline always means `env.py` was tested.
 The `test` extra in `pyproject.toml` installs it. GitHub Actions
