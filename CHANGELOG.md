@@ -12,6 +12,19 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-02
+
+### Added
+
+- `n_in_a_row.harness`, a shared harness for AI-safety experiments with the
+  solver as ground truth: an exact move labeller with an SQLite cache,
+  depth-d search monitors, regret metrics, tie sets and covert capacity,
+  AUROC / precision / power / CUSUM statistics, saboteur, sandbagger and
+  password-locked agents, and text play for language models (#11).
+- `n_in_a_row.harness.trainer`: the `learn_from_solver.py` distillation
+  pipeline as a library, with pluggable teachers; both examples now use it
+  and behave as before (#11).
+
 ## [1.0.2] - 2026-11-02
 
 ### Fixed
@@ -53,7 +66,8 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/JJBalisan/n-in-a-row/releases/tag/v1.0.0
