@@ -12,6 +12,24 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-02
+
+### Fixed
+
+- `textplay.parse_reply` reads the first cell on a `MOVE:` line, so
+  `MOVE: b2 (centre)` is b2 rather than unparseable (#15).
+- The stealth saboteur throws every blunder the monitor does not flag,
+  including those scored exactly at the threshold (#16).
+- `TextAgent` rejects a negative `retries` with `ValueError` instead of
+  failing with `UnboundLocalError` (#18).
+- The label cache is stamped with `labels.CACHE_VERSION` and a file with
+  another stamp raises `CacheVersionError` (#19).
+- `Sandbagger` passes `reset` and `observe` on to its fallback agent (#21).
+- The `MOVE:` line must start a word, so `remove:` is not read as a move
+  (#22).
+- `stats.power` returns 1.0 or 0.0 when both rates are 0 or 1 instead of
+  dividing by zero (#23).
+
 ## [1.1.0] - 2026-11-02
 
 ### Added
@@ -66,7 +84,8 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.0...v1.0.1
