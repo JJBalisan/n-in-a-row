@@ -250,7 +250,7 @@ n_in_a_row/
   gui.py       Tkinter board                                          [tkinter]
   harness/     labels, monitor, regret, ties, stats, zoo, textplay; trainer [NumPy]
 examples/      learn_from_solver.py, train_policy.py
-tests/         test_engine.py, test_cli.py, test_agents.py, test_harness.py (+ fake_agent.py) -- stdlib unittest
+tests/         test_engine.py, test_cli.py, test_agents.py, test_harness*.py (+ fake_agent.py) -- unittest
 ```
 
 ## Tests
