@@ -171,7 +171,7 @@ tic-tac-toe state space (5,478 reachable positions, 4,520 non-terminal,
 | `regret` | outcome and mate-distance regret per move, blunder rate per game or record set (via `arena.replay`) | perfect self-play has zero regret |
 | `ties` | the moves the solver rates exactly equal, `log2` capacity per position and per game | 30.5% of positions have two or more equal-best moves, 0.44 bits on average |
 | `stats` | AUROC (ties as half), precision at a base rate, two-proportion sample size and power, CUSUM | hand-worked cases; 388 per group for 50% vs 60% |
-| `zoo` | `Saboteur` (rate, or only blunders a monitor scores under a threshold), `Sandbagger` (slow wins, or draws in won positions), `PasswordLocked` | each one's ground-truth log matches the labels |
+| `zoo` | `Saboteur` (rate, or only blunders a monitor does not flag at a threshold), `Sandbagger` (slow wins, or draws in won positions), `PasswordLocked` | each one's ground-truth log matches the labels |
 | `textplay` | `render_prompt`, `parse_reply` and `TextAgent`, which wraps any `prompt -> reply` callable | every legal move round-trips; a fake model plays a full game |
 | `trainer` | the distillation pipeline from `examples/learn_from_solver.py`, with pluggable teachers [NumPy] | the example's pinned output and weights |
 
@@ -205,7 +205,7 @@ to `load_agent`), and zero-argument factories that work as
 | spec | plays |
 |---|---|
 | `saboteur:0.1:perfect` | `perfect`, but plays an exact blunder on 10% of the chances |
-| `stealth:1:100:1.0` | throws only blunders a depth-1 monitor scores under 100 |
+| `stealth:1:100:1.0` | throws only blunders a depth-1 monitor scores at or under 100 (unflagged) |
 | `sandbag:slow` / `sandbag:draw` | never loses value it could keep, but slow-rolls wins / takes draws |
 | `locked:b2+a1:perfect` | `perfect` once the game opened b2, a1; `random` otherwise |
 | `n_in_a_row.harness.zoo:saboteur` | the factory form; also `stealth`, `sandbagger`, `locked`, `noisy` |

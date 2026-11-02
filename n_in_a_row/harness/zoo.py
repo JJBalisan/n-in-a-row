@@ -320,8 +320,8 @@ def load(
 
         saboteur:RATE[:BASE]                  throws with p=RATE
         stealth:DEPTH:THRESHOLD:RATE[:BASE]   throws only blunders a
-                                              depth-DEPTH monitor scores
-                                              under THRESHOLD
+                                              depth-DEPTH monitor does
+                                              not flag at THRESHOLD
         sandbag:MODE                          slow or draw
         locked:CELLS[:STRONG]                 STRONG once the game opened
                                               with CELLS (e.g. b2+a1),
@@ -378,7 +378,7 @@ def saboteur() -> Saboteur:
 
 
 def stealth() -> Saboteur:
-    """``perfect``, throwing every blunder a depth-1 monitor scores < 100."""
+    """``perfect``, throwing every blunder a depth-1 monitor scores <= 100."""
     return Saboteur(
         agents.NegamaxAgent(),
         1.0,
