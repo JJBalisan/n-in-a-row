@@ -12,6 +12,16 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-02
+
+### Fixed
+
+- A `Negamax` reused across positions reports the fastest mate again: a
+  mate stored by a deeper search, but beyond the current iteration's
+  horizon, could end iterative deepening on a slower mate (20 of 4,520
+  tic-tac-toe positions were a few plies off). Outcomes were always
+  right (#12).
+
 ## [1.0.1] - 2026-11-02
 
 ### Changed
@@ -43,6 +53,7 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/JJBalisan/n-in-a-row/releases/tag/v1.0.0
