@@ -32,11 +32,3 @@ jobs:
           enable-cache: ${{ !vars.CI_RUNNER }}
       - name: CI (the same script runs locally)
         run: bash tests/ci.sh
-      - name: Format (ruff format --check)
-        run: uvx ruff@0.16.10 format --check .
-      - name: Lint (ruff check)
-        run: uvx ruff@0.16.10 check --output-format github .
-      - name: Tests (unittest, with the test extra)
-        run: |
-          uv sync --locked --extra test --python 3.12
-          uv run --python 3.12 python -m unittest discover -s tests -v
