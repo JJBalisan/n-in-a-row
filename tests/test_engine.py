@@ -7,9 +7,14 @@ import random
 import sys
 import unittest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_TESTS = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(_TESTS))
+sys.path.insert(0, _TESTS)
+
+import brute_force
 
 from n_in_a_row import agents, arena, cli, game, search
+from n_in_a_row.harness import labels
 
 
 class TestBoard(unittest.TestCase):
@@ -145,9 +150,11 @@ class TestSearch(unittest.TestCase):
         iteration stop on a slower mate (20 of these positions were wrong).
         """
         engine = search.Negamax()
-        for b in _reachable_live(3, 3, 3):
+        for b in labels.reachable(3, 3, 3):
+            if b.is_terminal:
+                continue
             got = {m: r.value for m, r in engine.evaluate_moves(b).items()}
-            self.assertEqual(got, _brute_force(b), b.cells)
+            self.assertEqual(got, brute_force.move_values(b), b.cells)
 
     def test_cli_solve_headline_agrees_with_its_table(self):
         """The solve headline matches the table row for its best move."""
@@ -176,46 +183,6 @@ class TestSearch(unittest.TestCase):
             {m: r.outcome for m, r in warm.items()},
             {m: r.outcome for m, r in fresh.items()},
         )
-
-
-def _reachable_live(rows, cols, k):
-    """Every unfinished position reachable from the empty board, once each."""
-    seen = {}
-    stack = [game.Board(rows, cols, k)]
-    while stack:
-        b = stack.pop()
-        key = tuple(b.cells)
-        if key in seen:
-            continue
-        seen[key] = b
-        for m in b.legal_moves():
-            child = b.copy()
-            child.push(m)
-            stack.append(child)
-    return [b for b in seen.values() if not b.is_terminal]
-
-
-def _brute_force(board):
-    """Exact move values by plain minimax, no pruning and no table."""
-    out = {}
-    for m in board.legal_moves():
-        board.push(m)
-        out[m] = search.shift_mate(-_minimax(board))
-        board.pop()
-    return out
-
-
-def _minimax(board):
-    if board.is_terminal:
-        # The side to move has just lost, or nobody has won.
-        return 0.0 if board.winner == game.DRAW else -float(search.WIN)
-    key = tuple(board.cells)
-    if key not in _MINIMAX:
-        _MINIMAX[key] = max(_brute_force(board).values())
-    return _MINIMAX[key]
-
-
-_MINIMAX = {}
 
 
 class TestAgents(unittest.TestCase):

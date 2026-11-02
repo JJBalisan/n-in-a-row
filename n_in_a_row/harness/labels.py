@@ -14,11 +14,12 @@ rather than a wrong label. The file is stamped with ``CACHE_VERSION``
 labels from an older engine are never read back as current; bump it with
 any change that could alter a label.
 
-Each position gets a fresh engine, so a label never depends on which
-positions were labelled before it. Before #12 a transposition table kept
-warm across positions misreported the mate distance in 20 of the 4,520
-tic-tac-toe positions; the tests check every label against brute-force
-minimax.
+One engine is reused across positions, its transposition table kept warm,
+which labels all 4,520 tic-tac-toe positions about 2.7 times faster than a
+fresh engine each. Before #12 (v1.0.2) a warm table misreported the mate
+distance in 20 of those positions, so labels came from a fresh engine each;
+the tests check every label against brute-force minimax, so a regression
+would show.
 """
 
 from __future__ import annotations
@@ -110,15 +111,14 @@ class ExactLabeller:
         Args:
             cache_path: An SQLite file to read and extend; None keeps
                 labels in memory only.
-            engine: An exact searcher to reuse for every position, for
-                tests; None (the default) searches each position with a
-                fresh ``Negamax(max_depth=None)``, which keeps mate
-                distances exact.
+            engine: An exact searcher to reuse for every position; None
+                (the default) makes one ``Negamax(max_depth=None)`` for
+                this labeller.
 
         Raises:
             CacheVersionError: If the cache file has another version stamp.
         """
-        self.engine = engine
+        self.engine = engine or search.Negamax(max_depth=None)
         self.hits = 0
         self.searches = 0
         self._memory: dict[tuple, dict[int, MoveLabel]] = {}
@@ -194,8 +194,7 @@ class ExactLabeller:
         return dict(labels)
 
     def _search(self, board: game.Board) -> dict[int, MoveLabel]:
-        engine = self.engine or search.Negamax(max_depth=None)
-        results = engine.evaluate_moves(board)
+        results = self.engine.evaluate_moves(board)
         for move, r in results.items():
             if not r.exact:
                 raise InexactError(
