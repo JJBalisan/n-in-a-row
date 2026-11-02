@@ -12,6 +12,13 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-02
+
+### Changed
+
+- CI runs `bash tests/ci.sh` alone: the format, lint and test steps after
+  it ran the same checks a second time (dev-toolchain#49) (#9).
+
 ## [1.0.0] - 2026-10-29
 
 ### Added
@@ -36,5 +43,6 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/JJBalisan/n-in-a-row/releases/tag/v1.0.0
