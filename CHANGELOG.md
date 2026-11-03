@@ -12,6 +12,18 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-11-03
+
+### Changed
+
+- `labels.ExactLabeller` reuses one engine across positions instead of a
+  fresh one each, labelling all 4,520 tic-tac-toe positions about 2.7
+  times faster with identical labels; the workaround was no longer needed
+  after the v1.0.2 engine fix (#17).
+- The engine and harness tests share one brute-force minimax reference,
+  `tests/brute_force.py`, and enumerate positions with `labels.reachable`
+  (#20).
+
 ## [1.1.2] - 2026-11-02
 
 ### Fixed
@@ -92,7 +104,8 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/JJBalisan/n-in-a-row/compare/v1.0.2...v1.1.0
