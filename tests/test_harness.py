@@ -21,6 +21,9 @@ from unittest import mock
 _TESTS = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_TESTS)
 sys.path.insert(0, _ROOT)
+sys.path.insert(0, _TESTS)
+
+import brute_force
 
 from n_in_a_row import agents, arena, game, search
 from n_in_a_row.harness import (
@@ -125,10 +128,13 @@ class TestExactLabeller(unittest.TestCase):
             labeller.label(game.Board())
 
     def test_values_match_brute_force_minimax(self):
-        # Mate distance included: before #12 a warm engine got 20 wrong.
+        # Mate distance included. LABELLER keeps one engine warm over every
+        # position, which before #12 got 20 of them wrong.
         for b, lab in zip(LIVE, LABELS):
             self.assertEqual(
-                {m: x.value for m, x in lab.items()}, _brute_force(b), b
+                {m: x.value for m, x in lab.items()},
+                brute_force.move_values(b),
+                b,
             )
 
     def test_cache_keeps_k_apart(self):
@@ -137,29 +143,6 @@ class TestExactLabeller(unittest.TestCase):
         k3 = LABELLER.label(game.Board.from_moves(moves, 3, 3, 3))
         self.assertEqual(labels.best_outcome(k2), 1)
         self.assertEqual(labels.best_outcome(k3), 0)
-
-
-def _brute_force(board):
-    """Exact move values by plain minimax, no pruning and no table."""
-    out = {}
-    for m in board.legal_moves():
-        board.push(m)
-        out[m] = search.shift_mate(-_minimax(board))
-        board.pop()
-    return out
-
-
-def _minimax(board):
-    if board.is_terminal:
-        # The side to move has just lost, or nobody has won.
-        return 0.0 if board.winner == game.DRAW else -float(search.WIN)
-    key = tuple(board.cells)
-    if key not in _MINIMAX:
-        _MINIMAX[key] = max(_brute_force(board).values())
-    return _MINIMAX[key]
-
-
-_MINIMAX = {}
 
 
 class TestLabelCache(unittest.TestCase):
