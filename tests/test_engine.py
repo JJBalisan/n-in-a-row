@@ -6,6 +6,7 @@ import os
 import random
 import sys
 import unittest
+from unittest import mock
 
 _TESTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_TESTS))
@@ -183,6 +184,63 @@ class TestSearch(unittest.TestCase):
             {m: r.outcome for m, r in warm.items()},
             {m: r.outcome for m, r in fresh.items()},
         )
+
+    @staticmethod
+    def _cut_search(board, nodes):
+        """Searches with a clock that reads the node count.
+
+        The deadline is checked every 1,024 nodes, so a limit of 1,024n - 1
+        cuts the search at node 1,024n, the same on every machine.
+        """
+        engine = search.Negamax(time_limit=nodes)
+        with mock.patch.object(
+            search.time, "perf_counter", lambda: engine.nodes
+        ):
+            return engine.search(board)
+
+    def test_time_cut_keeps_the_last_completed_move(self):
+        """A cut pass's half-searched best move must not replace the answer.
+
+        4x5, k=4, a draw: cut at node 2,048, the search once played b2 from
+        its partial fifth pass and called it "loss in 2", exact; b2 loses.
+        """
+        b = game.Board.from_moves([10, 18, 8, 7, 1, 19, 2], 4, 5, 4)
+        r = self._cut_search(b, 2047)
+        self.assertFalse(r.exact)
+        self.assertNotEqual(b.label(r.move), "b2")
+        whole = search.Negamax(max_depth=r.depth).search(b)
+        self.assertEqual((r.move, r.value), (whole.move, whole.value))
+
+    def test_time_cut_is_never_exact_unless_proven(self):
+        """4x4, k=3, a win only through a2: no cut may play or claim a loss."""
+        b = game.Board.from_moves([0, 10, 15, 1], 4, 4, 3)
+        truth = search.Negamax().search(b)
+        self.assertEqual(
+            (b.label(truth.move), truth.outcome), ("a2", "win in 4")
+        )
+        for nodes in range(1023, truth.nodes + 1024, 1024):
+            r = self._cut_search(b, nodes)
+            self.assertEqual(b.label(r.move), "a2", nodes)
+            if r.exact:
+                self.assertEqual(r.outcome, truth.outcome, nodes)
+            else:
+                self.assertLess(abs(r.value), search.WIN // 2, nodes)
+
+    def test_long_lines_do_not_fake_a_mate(self):
+        """For k >= 8 the heuristic once overflowed into the mate band.
+
+        3x10, k=8, X on a1-f1: g1 was "win in -54979", exact, at depth 1,
+        though O simply blocks at h1.
+        """
+        x, o = [0, 1, 2, 3, 4, 5], [12, 25, 17, 29, 21, 14]
+        b = game.Board.from_moves(
+            [m for pair in zip(x, o) for m in pair], 3, 10, 8
+        )
+        for depth in (1, 2, 3):
+            r = search.Negamax(max_depth=depth).search(b)
+            self.assertFalse(r.exact, depth)
+            self.assertLess(abs(r.value), search.WIN // 2, depth)
+            self.assertTrue(r.outcome.startswith("eval "), depth)
 
 
 class TestAgents(unittest.TestCase):

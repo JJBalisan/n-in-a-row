@@ -68,6 +68,10 @@ class TicTacToeGUI:
         agent: The opponent, or None when two humans share the board.
         human_side: The side the human plays against an agent.
         thinking: True while the opponent's move is being computed.
+        generation: Bumped by every new game or restart; an engine move
+            computed under an older generation is stale and dropped.
+        agent_lock: Held by a worker while it asks ``agent`` for a move.
+            Every game that uses the same agent object shares one lock.
         solver_values: Per-move solver results for the overlay.
     """
 
@@ -102,6 +106,9 @@ class TicTacToeGUI:
         self.human_side = human_side
         self.agent: agents.Agent | None = None
         self.thinking = False
+        self.generation = 0
+        self.agent_lock = threading.Lock()
+        self._agent_locks: dict[int, tuple[object, threading.Lock]] = {}
         self.queue: queue.Queue = queue.Queue()
         self.solver_values: dict[int, object] = {}
         self.solver_engine = search.Negamax(max_depth=None, time_limit=2.0)
@@ -294,9 +301,27 @@ class TicTacToeGUI:
                 overlay and restart background work.
         """
         if not keep_position:
-            rows = max(3, min(15, int(self.rows_var.get())))
-            cols = max(3, min(15, int(self.cols_var.get())))
-            k = max(2, min(max(rows, cols), int(self.k_var.get())))
+            # Read the controls before touching the current game: a cleared
+            # or garbled spinbox must leave it, and any engine move it is
+            # waiting for, exactly as they were.
+            try:
+                rows, cols, k = self._board_spec()
+            except (tk.TclError, ValueError, OverflowError):
+                messagebox.showerror(
+                    "Cannot start a new game",
+                    "Rows, cols and in a row must be whole numbers.",
+                )
+                return
+        # A worker still thinking about the old game cannot be stopped, so
+        # its move must not land on this one. Bump before changing the
+        # board: Tk timers, _poll among them, keep firing under the modal
+        # error dialog below.
+        self.generation += 1
+        self.thinking = False
+        if not keep_position:
+            # Show the size actually played, not what was typed.
+            self.rows_var.set(rows)
+            self.cols_var.set(cols)
             self.k_var.set(k)
             self.board = game.Board(rows, cols, k)
             self.opponent_spec = self.opp_var.get().strip() or "perfect"
@@ -312,10 +337,68 @@ class TicTacToeGUI:
                 self.opponent_spec = "perfect"
                 self.opp_var.set("perfect")
                 self.agent = agents.load_agent("perfect", self.rng)
+            self.agent_lock = self._lock_for(self.agent)
         self.solver_values = {}
-        self.thinking = False
         self.draw()
         self.after_move()
+
+    def _lock_for(self, agent: agents.Agent | None) -> threading.Lock:
+        """Returns the lock for asking ``agent`` for a move.
+
+        ``load_agent("mod:attr")`` can return one module-level instance to
+        every game, so a replaced game's worker may still be inside
+        ``select`` on the agent the new game uses: the lock belongs to the
+        agent, not the game. Only locks a worker holds are kept besides
+        this agent's; a worker still waiting for a dropped one belongs to a
+        replaced game and skips its search.
+
+        Args:
+            agent: The new game's opponent, or None.
+
+        Returns:
+            The lock every worker for this agent object takes.
+        """
+        self._agent_locks = {
+            key: (held, lock)
+            for key, (held, lock) in self._agent_locks.items()
+            if held is agent or lock.locked()
+        }
+        # Each entry keeps its agent alive, so its id cannot be reused.
+        entry = self._agent_locks.setdefault(
+            id(agent), (agent, threading.Lock())
+        )
+        return entry[1]
+
+    def _board_spec(self) -> tuple[int, int, int]:
+        """Reads rows, cols and k from the spinboxes, clamped to range.
+
+        Returns:
+            A (rows, cols, k) tuple.
+
+        Raises:
+            tk.TclError: A spinbox does not hold a whole number.
+        """
+        rows = max(3, min(15, self._whole(self.rows_var)))
+        cols = max(3, min(15, self._whole(self.cols_var)))
+        k = max(2, min(max(rows, cols), self._whole(self.k_var)))
+        return rows, cols, k
+
+    def _whole(self, var: tk.IntVar) -> int:
+        """Reads a spinbox's variable as a whole number.
+
+        ``IntVar.get()`` falls back to a float and truncates it, so 4.9
+        would quietly become 4; Tcl's own integer parse refuses it.
+
+        Args:
+            var: The spinbox's variable.
+
+        Returns:
+            Its value.
+
+        Raises:
+            tk.TclError: The variable does not hold a whole number.
+        """
+        return self.root.tk.getint(self.root.globalgetvar(str(var)))
 
     def undo(self) -> None:
         """Takes back the last move, or the last two against an agent."""
@@ -368,25 +451,49 @@ class TicTacToeGUI:
         if self.agent is not None and self.board.to_move != self.human_side:
             self.thinking = True
             self.draw()
-            threading.Thread(target=self._think, daemon=True).start()
+            # The worker gets its own board and this game's agent, so nothing
+            # it reads changes under it.
+            threading.Thread(
+                target=self._think,
+                args=(
+                    self.generation,
+                    self.board.copy(),
+                    self.agent,
+                    self.agent_lock,
+                ),
+                daemon=True,
+            ).start()
         elif self.show_solver.get():
             threading.Thread(target=self._read_position, daemon=True).start()
 
-    def _think(self) -> None:
-        snapshot = self.board.copy()
+    def _think(
+        self,
+        generation: int,
+        board: game.Board,
+        agent: agents.Agent,
+        lock: threading.Lock,
+    ) -> None:
         started = time.perf_counter()
         try:
-            move = self.agent.select(snapshot)
-            why = self.agent.explain(snapshot)
+            # An overlay toggle restarts the think with the same agent while
+            # the worker it replaced may still be running, and a shared
+            # agent can outlive its game: they take turns. A worker whose
+            # game was replaced while it waited skips the search, so quick
+            # toggles queue no searches whose moves would be dropped.
+            with lock:
+                if generation != self.generation:
+                    return
+                move = agent.select(board)
+                why = agent.explain(board)
         except Exception as exc:  # noqa: BLE001 - sent to the queue
-            self.queue.put(("error", str(exc)))
+            self.queue.put(("error", generation, str(exc)))
             return
         # Keep a slow-looking engine from feeling instant and a fast one from
         # flickering the board out from under the click.
         remaining = 0.22 - (time.perf_counter() - started)
         if remaining > 0:
             time.sleep(remaining)
-        self.queue.put(("move", move, why))
+        self.queue.put(("move", generation, move, why))
 
     def _read_position(self) -> None:
         snapshot = self.board.copy()
@@ -400,8 +507,10 @@ class TicTacToeGUI:
         try:
             while True:
                 item = self.queue.get_nowait()
+                if item[0] in ("move", "error") and item[1] != self.generation:
+                    continue  # computed for a game since replaced
                 if item[0] == "move":
-                    _, move, why = item
+                    _, _, move, why = item
                     self.thinking = False
                     if (
                         not self.board.is_terminal
@@ -418,11 +527,13 @@ class TicTacToeGUI:
                         self.draw()
                 elif item[0] == "error":
                     self.thinking = False
-                    messagebox.showerror("Opponent failed", item[1])
+                    messagebox.showerror("Opponent failed", item[2])
                     self.draw()
         except queue.Empty:
             pass
-        self.root.after(60, self._poll)
+        finally:
+            # Re-arm even if an item raised, or the GUI waits forever.
+            self.root.after(60, self._poll)
 
     # ---- geometry -------------------------------------------------------
 

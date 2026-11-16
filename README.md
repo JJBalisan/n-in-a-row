@@ -265,6 +265,9 @@ The `TestEnv` cases, the example tests and `test_harness_trainer.py` need
 NumPy. Locally they skip when it is missing; when the
 `CI` environment variable is set (GitLab and GitHub set `CI=true`) a missing
 NumPy fails them instead, so a green pipeline always means `env.py` was tested.
+The GUI tests in `test_characterization.py` work the same way with tkinter and
+a display: they skip locally without one and fail when `CI` is set
+(`tests/ci.sh` runs the suite under `xvfb-run` on a headless runner).
 The `test` extra in `pyproject.toml` installs it. GitHub Actions
 (`.github/workflows/ci.yml`) checks formatting, reports ruff findings
 without failing yet, then installs the test extra and runs the suite.

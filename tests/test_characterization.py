@@ -13,6 +13,7 @@ import io
 import os
 import re
 import sys
+import threading
 import unittest
 from unittest import mock
 
@@ -261,6 +262,24 @@ class TestRendering(unittest.TestCase):
             self.assertEqual(str(ctx.exception), msg)
 
 
+def _skip_gui(test, reason):
+    """Skips a GUI test locally, but fails it when CI is set.
+
+    Like the NumPy tests: a silent skip in CI would leave the engine-move
+    tests unrun behind a green run.
+
+    Args:
+        test: The running unittest.TestCase.
+        reason: Why the GUI cannot run.
+    """
+    if os.environ.get('CI'):
+        test.fail(
+            f'{reason} but CI is set; the GUI tests need tkinter and a '
+            'display (tests/ci.sh uses xvfb-run when there is none)'
+        )
+    test.skipTest(f'{reason} (set CI=1 to make this a failure)')
+
+
 def _import_gui(test):
     """Imports n_in_a_row.gui, skipping when tkinter is unavailable.
 
@@ -273,7 +292,7 @@ def _import_gui(test):
     try:
         from n_in_a_row import gui
     except (ImportError, SystemExit):
-        test.skipTest('tkinter is not available')
+        _skip_gui(test, 'tkinter is not available')
     return gui
 
 
@@ -335,6 +354,255 @@ class TestGuiHelpers(unittest.TestCase):
                 seed=seed,
             )
             root.mainloop.assert_called_once_with()
+
+
+class _ScriptedAgent:
+    """An opponent that plays the given moves in turn."""
+
+    def __init__(self, moves):
+        self.moves = list(moves)
+
+    def select(self, board):
+        del board
+        return self.moves.pop(0)
+
+    def explain(self, board):
+        del board
+        return ''
+
+
+class TestGuiEngineMoves(unittest.TestCase):
+    """Engine moves computed for a replaced game must not be played."""
+
+    def setUp(self):
+        gui = _import_gui(self)
+        try:
+            self.root = gui.tk.Tk()
+        except gui.tk.TclError:
+            _skip_gui(self, 'no display')
+        self.addCleanup(self.root.destroy)
+        self.root.withdraw()
+        # Hold each worker instead of starting it, to run it when we choose.
+        self.workers = []
+        fake = mock.Mock()
+        fake.Lock = threading.Lock
+        fake.Thread.side_effect = lambda target, args=(), daemon=None: (
+            self.workers.append((target, args)) or mock.Mock()
+        )
+        patcher = mock.patch.object(gui, 'threading', fake)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        # Each new game's opponent: set side_effect to the agents in turn.
+        patcher = mock.patch.object(gui.agents, 'load_agent')
+        self.load = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.gui = gui
+
+    def _window(self, size):
+        """Opens a window where the engine (X) is thinking about move one."""
+        return self.gui.TicTacToeGUI(
+            self.root,
+            size,
+            size,
+            3,
+            opponent_spec='perfect',
+            human_side=game.O,
+            show_solver=False,
+        )
+
+    def _finish_workers(self, window):
+        while self.workers:
+            target, args = self.workers.pop(0)
+            target(*args)
+        window._poll()
+
+    @staticmethod
+    def _counting(agent, lock):
+        """Records whether lock was held at each select() in the list."""
+        calls, select = [], agent.select
+
+        def counted(board):
+            calls.append(lock.locked())
+            return select(board)
+
+        agent.select = counted
+        return calls
+
+    def test_overlay_toggle_mid_think_plays_one_move(self):
+        agent = _ScriptedAgent([4, 0])
+        self.load.side_effect = [agent]
+        window = self._window(3)
+        target, stale = self.workers.pop(0)
+        calls = self._counting(agent, stale[3])
+        select = agent.select
+
+        def mid_search(board):
+            if not calls:
+                window.show_solver.set(True)  # restarts the engine's think
+            return select(board)
+
+        agent.select = mid_search
+        target(*stale)
+        # Both workers ask the one agent, so each holds its lock to do it.
+        ((_, live),) = self.workers
+        self.assertIs(stale[2], live[2])
+        self.assertIs(stale[3], live[3])
+        self._finish_workers(window)
+        self.assertEqual(calls, [True, True])
+        self.assertEqual(window.board.ply, 1)
+        self.assertEqual(window.board.cells[0], game.X)
+        self.assertEqual(window.board.to_move, game.O)
+        self.assertFalse(window.thinking)
+
+    def test_overlay_toggles_before_the_search_run_one_search(self):
+        agent = _ScriptedAgent([0, 1, 2, 3, 4])
+        self.load.side_effect = [agent]
+        window = self._window(3)
+        for _ in range(4):
+            window.show_solver.set(not window.show_solver.get())
+        self.assertEqual(len(self.workers), 5)
+        calls = self._counting(agent, self.workers[0][1][3])
+        self._finish_workers(window)
+        # The four replaced workers skip their search once they get the lock.
+        self.assertEqual(calls, [True])
+        self.assertEqual(window.board.cells[0], game.X)
+        self.assertEqual(window.board.ply, 1)
+
+    def test_games_sharing_an_agent_share_its_lock(self):
+        # load_agent('mod:attr') can hand every game one module-level agent.
+        shared, other = _ScriptedAgent([0]), _ScriptedAgent([])
+        self.load.side_effect = [shared, other, shared, shared]
+        window = self._window(3)
+        _, first = self.workers.pop(0)
+        lock = first[3]
+        lock.acquire()  # the first game's worker is mid-search
+        self.addCleanup(lambda: lock.locked() and lock.release())
+        window.new_game()
+        _, second = self.workers.pop(0)
+        # Another agent never waits on an unrelated search.
+        self.assertIsNot(second[3], lock)
+        window.new_game()
+        _, third = self.workers.pop(0)
+        self.assertIs(third[2], shared)
+        self.assertIs(third[3], lock)
+        lock.release()
+        window.new_game()
+        self.assertIs(self.workers[0][1][3], lock)
+        # The replaced games' workers skip the search; the live one plays.
+        calls = self._counting(shared, lock)
+        self.workers.insert(0, (window._think, first))
+        self._finish_workers(window)
+        self.assertEqual(calls, [True])
+        self.assertEqual(window.board.cells[0], game.X)
+        self.assertEqual(window.board.ply, 1)
+
+    def test_worker_keeps_the_position_and_agent_it_started_with(self):
+        seen = []
+        agent = _ScriptedAgent([4])
+        select = agent.select
+        agent.select = lambda b: seen.append(b.ply) or select(b)
+        self.load.side_effect = [agent]
+        window = self._window(3)
+        # The window's state moves on before the worker gets to run.
+        window.board.push(0)
+        window.agent = None
+        target, args = self.workers.pop(0)
+        target(*args)
+        self.assertEqual(seen, [0])
+
+    def test_new_game_mid_think_drops_the_old_move(self):
+        # 24 is off a 3x3 board.
+        self.load.side_effect = [_ScriptedAgent([24]), _ScriptedAgent([4])]
+        window = self._window(5)
+        window.rows_var.set(3)
+        window.cols_var.set(3)
+        window.new_game()
+        self._finish_workers(window)
+        self.assertEqual(window.board.spec, (3, 3, 3))
+        self.assertEqual(window.board.cells[4], game.X)
+        self.assertEqual(window.board.ply, 1)
+
+    def test_bad_opponent_dialog_drops_the_old_move(self):
+        stale, fresh = _ScriptedAgent([0]), _ScriptedAgent([4])
+        self.load.side_effect = [stale, ValueError('no such agent'), fresh]
+        under_dialog = []
+
+        def showerror(title, message):
+            # Tk timers keep firing under the modal dialog: the old game's
+            # worker finishes and _poll drains its move.
+            del title, message
+            self._finish_workers(window)
+            under_dialog.append(window.board.ply)
+
+        with mock.patch.object(self.gui.messagebox, 'showerror', showerror):
+            window = self._window(3)
+            window.opp_var.set('nonsense')
+            window.new_game()
+        self.assertEqual(under_dialog, [0])
+        self._finish_workers(window)
+        self.assertEqual(window.board.cells[0], game.EMPTY)
+        self.assertEqual(window.board.cells[4], game.X)
+        self.assertEqual(window.board.ply, 1)
+
+    def test_invalid_size_mid_think_leaves_the_game_alone(self):
+        for name, text in (
+            ('rows_var', ''),
+            ('cols_var', 'inf'),
+            ('k_var', 'three'),
+        ):
+            with self.subTest(control=name, text=text):
+                self.workers.clear()
+                self.load.reset_mock()
+                self.load.side_effect = [_ScriptedAgent([4])]
+                with mock.patch.object(
+                    self.gui.messagebox, 'showerror'
+                ) as showerror:
+                    window = self._window(3)
+                    generation = window.generation
+                    # A cleared or garbled spinbox: reading it raises.
+                    self.root.globalsetvar(str(getattr(window, name)), text)
+                    window.new_game()
+                showerror.assert_called_once()
+                self.assertEqual(window.generation, generation)
+                self.assertTrue(window.thinking)
+                self.assertEqual(self.load.call_count, 1)
+                # The worker already thinking still lands its move.
+                self._finish_workers(window)
+                self.assertEqual(window.board.cells[4], game.X)
+                self.assertEqual(window.board.ply, 1)
+                self.assertFalse(window.thinking)
+
+    def test_fractional_size_shows_the_dialog(self):
+        # The dialog asks for whole numbers, so 4.9 must not become 4.
+        for name in ('rows_var', 'cols_var', 'k_var'):
+            with self.subTest(control=name):
+                self.workers.clear()
+                self.load.reset_mock()
+                self.load.side_effect = [_ScriptedAgent([4])]
+                with mock.patch.object(
+                    self.gui.messagebox, 'showerror'
+                ) as showerror:
+                    window = self._window(5)
+                    generation = window.generation
+                    self.root.globalsetvar(str(getattr(window, name)), '4.9')
+                    window.new_game()
+                showerror.assert_called_once()
+                self.assertEqual(window.generation, generation)
+                self.assertEqual(window.board.spec, (5, 5, 3))
+                self.assertEqual(self.load.call_count, 1)
+
+    def test_new_game_shows_the_clamped_size(self):
+        self.load.side_effect = [_ScriptedAgent([]), _ScriptedAgent([])]
+        window = self._window(3)
+        window.rows_var.set(99)
+        window.cols_var.set(1)
+        window.k_var.set(50)
+        window.new_game()
+        self.assertEqual(window.board.spec, (15, 3, 15))
+        self.assertEqual(
+            (window.rows_var.get(), window.cols_var.get(), window.k_var.get()),
+            (15, 3, 15),
+        )
 
 
 class TestExamples(unittest.TestCase):

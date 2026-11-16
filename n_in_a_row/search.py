@@ -18,6 +18,10 @@ WIN = 1_000_000
 #: cap the depth instead and flag the result as inexact rather than hanging.
 SOFT_EXACT_LIMIT = 14
 
+#: The heuristic is clamped to stay below the mate band (abs > WIN // 2): for
+#: k >= 8 a single window one stone short is already worth 10**(k-2) >= WIN.
+EVAL_LIMIT = WIN // 2 - 1
+
 EXACT, LOWER, UPPER = 0, 1, 2
 
 
@@ -114,8 +118,8 @@ class Negamax:
             board: The position to search.
 
         Returns:
-            The result of the deepest iteration, or the best move of a
-            partial one when the time limit cut it short.
+            The result of the deepest iteration that completed. A pass the
+            time limit cut short is discarded, never reported as exact.
         """
         started = time.perf_counter()
         self.nodes = 0
@@ -150,18 +154,25 @@ class Negamax:
         # a usable answer already in hand.
         for d in range(1, target + 1):
             move, value, completed = self._root(board, d)
-            if move is not None:
-                best_move, best_value = move, value
             if not completed:
+                # A cut pass searched only some root moves, in static order,
+                # so its best so far may be a refuted move: keep the last
+                # completed pass, and only fall back if there is none.
+                if best_move is None:
+                    best_move, best_value = move, value
                 break
+            best_move, best_value = move, value
             reached = d
             if abs(value) > WIN // 2:
                 break  # a forced result will not change with more depth
 
         # A mate-valued score means a real terminal node was reached, so it is
         # game-theoretic regardless of the horizon. A drawish score is only
-        # trustworthy if we searched every remaining move.
-        proven = abs(best_value) > WIN // 2 or reached >= empties
+        # trustworthy if we searched every remaining move. Either way it must
+        # come from a pass that completed.
+        proven = reached > 0 and (
+            abs(best_value) > WIN // 2 or reached >= empties
+        )
 
         return SearchResult(
             move=best_move,
@@ -330,7 +341,8 @@ class Negamax:
         """Threat count: every k-window that still belongs to one player only.
 
         A window with c of my stones and no opponent stone is worth 10**c, so a
-        line one short of complete dominates one that is two short.
+        line one short of complete dominates one that is two short. The total
+        is clamped to EVAL_LIMIT so it can never pass for a forced mate.
         """
         cells = board.cells
         empty = game.EMPTY
@@ -351,6 +363,10 @@ class Negamax:
                 total += w[mine]
             elif theirs:
                 total -= w[theirs]
+        if total > EVAL_LIMIT:
+            return EVAL_LIMIT
+        if total < -EVAL_LIMIT:
+            return -EVAL_LIMIT
         return total
 
 
