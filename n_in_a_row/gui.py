@@ -70,6 +70,7 @@ class TicTacToeGUI:
         thinking: True while the opponent's move is being computed.
         generation: Bumped by every new game or restart; an engine move
             computed under an older generation is stale and dropped.
+        agent_lock: Held by a worker while it asks ``agent`` for a move.
         solver_values: Per-move solver results for the overlay.
     """
 
@@ -105,6 +106,7 @@ class TicTacToeGUI:
         self.agent: agents.Agent | None = None
         self.thinking = False
         self.generation = 0
+        self.agent_lock = threading.Lock()
         self.queue: queue.Queue = queue.Queue()
         self.solver_values: dict[int, object] = {}
         self.solver_engine = search.Negamax(max_depth=None, time_limit=2.0)
@@ -321,6 +323,7 @@ class TicTacToeGUI:
                 self.opponent_spec = "perfect"
                 self.opp_var.set("perfect")
                 self.agent = agents.load_agent("perfect", self.rng)
+            self.agent_lock = threading.Lock()
         self.solver_values = {}
         self.draw()
         self.after_move()
@@ -376,18 +379,35 @@ class TicTacToeGUI:
         if self.agent is not None and self.board.to_move != self.human_side:
             self.thinking = True
             self.draw()
+            # The worker gets its own board and this game's agent, so nothing
+            # it reads changes under it.
             threading.Thread(
-                target=self._think, args=(self.generation,), daemon=True
+                target=self._think,
+                args=(
+                    self.generation,
+                    self.board.copy(),
+                    self.agent,
+                    self.agent_lock,
+                ),
+                daemon=True,
             ).start()
         elif self.show_solver.get():
             threading.Thread(target=self._read_position, daemon=True).start()
 
-    def _think(self, generation: int) -> None:
-        snapshot = self.board.copy()
+    def _think(
+        self,
+        generation: int,
+        board: game.Board,
+        agent: agents.Agent,
+        lock: threading.Lock,
+    ) -> None:
         started = time.perf_counter()
         try:
-            move = self.agent.select(snapshot)
-            why = self.agent.explain(snapshot)
+            # An overlay toggle restarts the think with the same agent while
+            # the worker it replaced may still be running: they take turns.
+            with lock:
+                move = agent.select(board)
+                why = agent.explain(board)
         except Exception as exc:  # noqa: BLE001 - sent to the queue
             self.queue.put(("error", generation, str(exc)))
             return

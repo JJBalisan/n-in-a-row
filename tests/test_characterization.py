@@ -13,6 +13,7 @@ import io
 import os
 import re
 import sys
+import threading
 import unittest
 from unittest import mock
 
@@ -366,11 +367,16 @@ class TestGuiEngineMoves(unittest.TestCase):
         # Hold each worker instead of starting it, to run it when we choose.
         self.workers = []
         fake = mock.Mock()
+        fake.Lock = threading.Lock
         fake.Thread.side_effect = lambda target, args=(), daemon=None: (
             self.workers.append((target, args)) or mock.Mock()
         )
         patcher = mock.patch.object(gui, 'threading', fake)
         patcher.start()
+        self.addCleanup(patcher.stop)
+        # Each new game's opponent: set side_effect to the agents in turn.
+        patcher = mock.patch.object(gui.agents, 'load_agent')
+        self.load = patcher.start()
         self.addCleanup(patcher.stop)
         self.gui = gui
 
@@ -393,21 +399,45 @@ class TestGuiEngineMoves(unittest.TestCase):
         window._poll()
 
     def test_overlay_toggle_mid_think_plays_one_move(self):
+        agent = _ScriptedAgent([4, 0])
+        self.load.side_effect = [agent]
         window = self._window(3)
-        window.agent = _ScriptedAgent([4, 0])
         window.show_solver.set(True)  # restarts the engine's think
         self.assertEqual(len(self.workers), 2)
+        # Both workers ask the one agent, so each holds its lock to do it.
+        (_, stale), (_, live) = self.workers
+        self.assertIs(stale[2], live[2])
+        self.assertIs(stale[3], live[3])
+        lock, select, held = stale[3], agent.select, []
+        agent.select = lambda b: held.append(lock.locked()) or select(b)
         self._finish_workers(window)
+        self.assertEqual(held, [True, True])
         self.assertEqual(window.board.ply, 1)
+        self.assertEqual(window.board.cells[0], game.X)
         self.assertEqual(window.board.to_move, game.O)
         self.assertFalse(window.thinking)
 
+    def test_worker_keeps_the_position_and_agent_it_started_with(self):
+        seen = []
+        agent = _ScriptedAgent([4])
+        select = agent.select
+        agent.select = lambda b: seen.append(b.ply) or select(b)
+        self.load.side_effect = [agent]
+        window = self._window(3)
+        # The window's state moves on before the worker gets to run.
+        window.board.push(0)
+        window.agent = None
+        target, args = self.workers.pop(0)
+        target(*args)
+        self.assertEqual(seen, [0])
+
     def test_new_game_mid_think_drops_the_old_move(self):
+        # 24 is off a 3x3 board.
+        self.load.side_effect = [_ScriptedAgent([24]), _ScriptedAgent([4])]
         window = self._window(5)
         window.rows_var.set(3)
         window.cols_var.set(3)
         window.new_game()
-        window.agent = _ScriptedAgent([24, 4])  # 24 is off a 3x3 board
         self._finish_workers(window)
         self.assertEqual(window.board.spec, (3, 3, 3))
         self.assertEqual(window.board.cells[4], game.X)
@@ -415,9 +445,7 @@ class TestGuiEngineMoves(unittest.TestCase):
 
     def test_bad_opponent_dialog_drops_the_old_move(self):
         stale, fresh = _ScriptedAgent([0]), _ScriptedAgent([4])
-        load = mock.Mock(
-            side_effect=[stale, ValueError('no such agent'), fresh]
-        )
+        self.load.side_effect = [stale, ValueError('no such agent'), fresh]
         under_dialog = []
 
         def showerror(title, message):
@@ -427,10 +455,7 @@ class TestGuiEngineMoves(unittest.TestCase):
             self._finish_workers(window)
             under_dialog.append(window.board.ply)
 
-        with (
-            mock.patch.object(self.gui.agents, 'load_agent', load),
-            mock.patch.object(self.gui.messagebox, 'showerror', showerror),
-        ):
+        with mock.patch.object(self.gui.messagebox, 'showerror', showerror):
             window = self._window(3)
             window.opp_var.set('nonsense')
             window.new_game()
