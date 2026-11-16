@@ -387,7 +387,8 @@ class TestGuiEngineMoves(unittest.TestCase):
         )
 
     def _finish_workers(self, window):
-        for target, args in self.workers:
+        while self.workers:
+            target, args = self.workers.pop(0)
             target(*args)
         window._poll()
 
@@ -409,6 +410,33 @@ class TestGuiEngineMoves(unittest.TestCase):
         window.agent = _ScriptedAgent([24, 4])  # 24 is off a 3x3 board
         self._finish_workers(window)
         self.assertEqual(window.board.spec, (3, 3, 3))
+        self.assertEqual(window.board.cells[4], game.X)
+        self.assertEqual(window.board.ply, 1)
+
+    def test_bad_opponent_dialog_drops_the_old_move(self):
+        stale, fresh = _ScriptedAgent([0]), _ScriptedAgent([4])
+        load = mock.Mock(
+            side_effect=[stale, ValueError('no such agent'), fresh]
+        )
+        under_dialog = []
+
+        def showerror(title, message):
+            # Tk timers keep firing under the modal dialog: the old game's
+            # worker finishes and _poll drains its move.
+            del title, message
+            self._finish_workers(window)
+            under_dialog.append(window.board.ply)
+
+        with (
+            mock.patch.object(self.gui.agents, 'load_agent', load),
+            mock.patch.object(self.gui.messagebox, 'showerror', showerror),
+        ):
+            window = self._window(3)
+            window.opp_var.set('nonsense')
+            window.new_game()
+        self.assertEqual(under_dialog, [0])
+        self._finish_workers(window)
+        self.assertEqual(window.board.cells[0], game.EMPTY)
         self.assertEqual(window.board.cells[4], game.X)
         self.assertEqual(window.board.ply, 1)
 

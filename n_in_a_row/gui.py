@@ -296,6 +296,12 @@ class TicTacToeGUI:
             keep_position: Keep the board and opponent; only clear the
                 overlay and restart background work.
         """
+        # A worker still thinking about the old game cannot be stopped, so
+        # its move must not land on this one. Bump before anything else:
+        # Tk timers, _poll among them, keep firing under the modal error
+        # dialog below.
+        self.generation += 1
+        self.thinking = False
         if not keep_position:
             rows = max(3, min(15, int(self.rows_var.get())))
             cols = max(3, min(15, int(self.cols_var.get())))
@@ -316,10 +322,6 @@ class TicTacToeGUI:
                 self.opp_var.set("perfect")
                 self.agent = agents.load_agent("perfect", self.rng)
         self.solver_values = {}
-        self.thinking = False
-        # A worker still thinking about the old game cannot be stopped, so
-        # its move must not land on this one.
-        self.generation += 1
         self.draw()
         self.after_move()
 
