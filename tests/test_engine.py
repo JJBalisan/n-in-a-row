@@ -226,6 +226,22 @@ class TestSearch(unittest.TestCase):
             else:
                 self.assertLess(abs(r.value), search.WIN // 2, nodes)
 
+    def test_long_lines_do_not_fake_a_mate(self):
+        """For k >= 8 the heuristic once overflowed into the mate band.
+
+        3x10, k=8, X on a1-f1: g1 was "win in -54979", exact, at depth 1,
+        though O simply blocks at h1.
+        """
+        x, o = [0, 1, 2, 3, 4, 5], [12, 25, 17, 29, 21, 14]
+        b = game.Board.from_moves(
+            [m for pair in zip(x, o) for m in pair], 3, 10, 8
+        )
+        for depth in (1, 2, 3):
+            r = search.Negamax(max_depth=depth).search(b)
+            self.assertFalse(r.exact, depth)
+            self.assertLess(abs(r.value), search.WIN // 2, depth)
+            self.assertTrue(r.outcome.startswith("eval "), depth)
+
 
 class TestAgents(unittest.TestCase):
     def test_specs_load(self):

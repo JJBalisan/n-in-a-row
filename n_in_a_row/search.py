@@ -18,6 +18,10 @@ WIN = 1_000_000
 #: cap the depth instead and flag the result as inexact rather than hanging.
 SOFT_EXACT_LIMIT = 14
 
+#: The heuristic is clamped to stay below the mate band (abs > WIN // 2): for
+#: k >= 8 a single window one stone short is already worth 10**(k-2) >= WIN.
+EVAL_LIMIT = WIN // 2 - 1
+
 EXACT, LOWER, UPPER = 0, 1, 2
 
 
@@ -337,7 +341,8 @@ class Negamax:
         """Threat count: every k-window that still belongs to one player only.
 
         A window with c of my stones and no opponent stone is worth 10**c, so a
-        line one short of complete dominates one that is two short.
+        line one short of complete dominates one that is two short. The total
+        is clamped to EVAL_LIMIT so it can never pass for a forced mate.
         """
         cells = board.cells
         empty = game.EMPTY
@@ -358,6 +363,10 @@ class Negamax:
                 total += w[mine]
             elif theirs:
                 total -= w[theirs]
+        if total > EVAL_LIMIT:
+            return EVAL_LIMIT
+        if total < -EVAL_LIMIT:
+            return -EVAL_LIMIT
         return total
 
 
