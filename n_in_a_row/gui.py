@@ -298,16 +298,25 @@ class TicTacToeGUI:
             keep_position: Keep the board and opponent; only clear the
                 overlay and restart background work.
         """
+        if not keep_position:
+            # Read the controls before touching the current game: a cleared
+            # or garbled spinbox must leave it, and any engine move it is
+            # waiting for, exactly as they were.
+            try:
+                rows, cols, k = self._board_spec()
+            except (tk.TclError, ValueError, OverflowError):
+                messagebox.showerror(
+                    "Cannot start a new game",
+                    "Rows, cols and in a row must be whole numbers.",
+                )
+                return
         # A worker still thinking about the old game cannot be stopped, so
-        # its move must not land on this one. Bump before anything else:
-        # Tk timers, _poll among them, keep firing under the modal error
-        # dialog below.
+        # its move must not land on this one. Bump before changing the
+        # board: Tk timers, _poll among them, keep firing under the modal
+        # error dialog below.
         self.generation += 1
         self.thinking = False
         if not keep_position:
-            rows = max(3, min(15, int(self.rows_var.get())))
-            cols = max(3, min(15, int(self.cols_var.get())))
-            k = max(2, min(max(rows, cols), int(self.k_var.get())))
             self.k_var.set(k)
             self.board = game.Board(rows, cols, k)
             self.opponent_spec = self.opp_var.get().strip() or "perfect"
@@ -327,6 +336,21 @@ class TicTacToeGUI:
         self.solver_values = {}
         self.draw()
         self.after_move()
+
+    def _board_spec(self) -> tuple[int, int, int]:
+        """Reads rows, cols and k from the spinboxes, clamped to range.
+
+        Returns:
+            A (rows, cols, k) tuple.
+
+        Raises:
+            tk.TclError: A spinbox does not hold a number.
+            OverflowError: A spinbox holds an infinity.
+        """
+        rows = max(3, min(15, self.rows_var.get()))
+        cols = max(3, min(15, self.cols_var.get()))
+        k = max(2, min(max(rows, cols), self.k_var.get()))
+        return rows, cols, k
 
     def undo(self) -> None:
         """Takes back the last move, or the last two against an agent."""

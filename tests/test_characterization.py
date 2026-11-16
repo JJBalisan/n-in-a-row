@@ -465,6 +465,34 @@ class TestGuiEngineMoves(unittest.TestCase):
         self.assertEqual(window.board.cells[4], game.X)
         self.assertEqual(window.board.ply, 1)
 
+    def test_invalid_size_mid_think_leaves_the_game_alone(self):
+        for name, text in (
+            ('rows_var', ''),
+            ('cols_var', 'inf'),
+            ('k_var', 'three'),
+        ):
+            with self.subTest(control=name, text=text):
+                self.workers.clear()
+                self.load.reset_mock()
+                self.load.side_effect = [_ScriptedAgent([4])]
+                with mock.patch.object(
+                    self.gui.messagebox, 'showerror'
+                ) as showerror:
+                    window = self._window(3)
+                    generation = window.generation
+                    # A cleared or garbled spinbox: IntVar.get() raises.
+                    self.root.globalsetvar(str(getattr(window, name)), text)
+                    window.new_game()
+                showerror.assert_called_once()
+                self.assertEqual(window.generation, generation)
+                self.assertTrue(window.thinking)
+                self.assertEqual(self.load.call_count, 1)
+                # The worker already thinking still lands its move.
+                self._finish_workers(window)
+                self.assertEqual(window.board.cells[4], game.X)
+                self.assertEqual(window.board.ply, 1)
+                self.assertFalse(window.thinking)
+
 
 class TestExamples(unittest.TestCase):
     def setUp(self):
