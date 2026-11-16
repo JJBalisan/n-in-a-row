@@ -114,8 +114,8 @@ class Negamax:
             board: The position to search.
 
         Returns:
-            The result of the deepest iteration, or the best move of a
-            partial one when the time limit cut it short.
+            The result of the deepest iteration that completed. A pass the
+            time limit cut short is discarded, never reported as exact.
         """
         started = time.perf_counter()
         self.nodes = 0
@@ -150,18 +150,25 @@ class Negamax:
         # a usable answer already in hand.
         for d in range(1, target + 1):
             move, value, completed = self._root(board, d)
-            if move is not None:
-                best_move, best_value = move, value
             if not completed:
+                # A cut pass searched only some root moves, in static order,
+                # so its best so far may be a refuted move: keep the last
+                # completed pass, and only fall back if there is none.
+                if best_move is None:
+                    best_move, best_value = move, value
                 break
+            best_move, best_value = move, value
             reached = d
             if abs(value) > WIN // 2:
                 break  # a forced result will not change with more depth
 
         # A mate-valued score means a real terminal node was reached, so it is
         # game-theoretic regardless of the horizon. A drawish score is only
-        # trustworthy if we searched every remaining move.
-        proven = abs(best_value) > WIN // 2 or reached >= empties
+        # trustworthy if we searched every remaining move. Either way it must
+        # come from a pass that completed.
+        proven = reached > 0 and (
+            abs(best_value) > WIN // 2 or reached >= empties
+        )
 
         return SearchResult(
             move=best_move,
