@@ -68,6 +68,8 @@ class TicTacToeGUI:
         agent: The opponent, or None when two humans share the board.
         human_side: The side the human plays against an agent.
         thinking: True while the opponent's move is being computed.
+        generation: Bumped by every new game or restart; an engine move
+            computed under an older generation is stale and dropped.
         solver_values: Per-move solver results for the overlay.
     """
 
@@ -102,6 +104,7 @@ class TicTacToeGUI:
         self.human_side = human_side
         self.agent: agents.Agent | None = None
         self.thinking = False
+        self.generation = 0
         self.queue: queue.Queue = queue.Queue()
         self.solver_values: dict[int, object] = {}
         self.solver_engine = search.Negamax(max_depth=None, time_limit=2.0)
@@ -314,6 +317,9 @@ class TicTacToeGUI:
                 self.agent = agents.load_agent("perfect", self.rng)
         self.solver_values = {}
         self.thinking = False
+        # A worker still thinking about the old game cannot be stopped, so
+        # its move must not land on this one.
+        self.generation += 1
         self.draw()
         self.after_move()
 
@@ -368,25 +374,27 @@ class TicTacToeGUI:
         if self.agent is not None and self.board.to_move != self.human_side:
             self.thinking = True
             self.draw()
-            threading.Thread(target=self._think, daemon=True).start()
+            threading.Thread(
+                target=self._think, args=(self.generation,), daemon=True
+            ).start()
         elif self.show_solver.get():
             threading.Thread(target=self._read_position, daemon=True).start()
 
-    def _think(self) -> None:
+    def _think(self, generation: int) -> None:
         snapshot = self.board.copy()
         started = time.perf_counter()
         try:
             move = self.agent.select(snapshot)
             why = self.agent.explain(snapshot)
         except Exception as exc:  # noqa: BLE001 - sent to the queue
-            self.queue.put(("error", str(exc)))
+            self.queue.put(("error", generation, str(exc)))
             return
         # Keep a slow-looking engine from feeling instant and a fast one from
         # flickering the board out from under the click.
         remaining = 0.22 - (time.perf_counter() - started)
         if remaining > 0:
             time.sleep(remaining)
-        self.queue.put(("move", move, why))
+        self.queue.put(("move", generation, move, why))
 
     def _read_position(self) -> None:
         snapshot = self.board.copy()
@@ -400,8 +408,10 @@ class TicTacToeGUI:
         try:
             while True:
                 item = self.queue.get_nowait()
+                if item[0] in ("move", "error") and item[1] != self.generation:
+                    continue  # computed for a game since replaced
                 if item[0] == "move":
-                    _, move, why = item
+                    _, _, move, why = item
                     self.thinking = False
                     if (
                         not self.board.is_terminal
@@ -418,11 +428,13 @@ class TicTacToeGUI:
                         self.draw()
                 elif item[0] == "error":
                     self.thinking = False
-                    messagebox.showerror("Opponent failed", item[1])
+                    messagebox.showerror("Opponent failed", item[2])
                     self.draw()
         except queue.Empty:
             pass
-        self.root.after(60, self._poll)
+        finally:
+            # Re-arm even if an item raised, or the GUI waits forever.
+            self.root.after(60, self._poll)
 
     # ---- geometry -------------------------------------------------------
 

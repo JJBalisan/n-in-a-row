@@ -337,6 +337,82 @@ class TestGuiHelpers(unittest.TestCase):
             root.mainloop.assert_called_once_with()
 
 
+class _ScriptedAgent:
+    """An opponent that plays the given moves in turn."""
+
+    def __init__(self, moves):
+        self.moves = list(moves)
+
+    def select(self, board):
+        del board
+        return self.moves.pop(0)
+
+    def explain(self, board):
+        del board
+        return ''
+
+
+class TestGuiEngineMoves(unittest.TestCase):
+    """Engine moves computed for a replaced game must not be played."""
+
+    def setUp(self):
+        gui = _import_gui(self)
+        try:
+            self.root = gui.tk.Tk()
+        except gui.tk.TclError:
+            self.skipTest('no display')
+        self.addCleanup(self.root.destroy)
+        self.root.withdraw()
+        # Hold each worker instead of starting it, to run it when we choose.
+        self.workers = []
+        fake = mock.Mock()
+        fake.Thread.side_effect = lambda target, args=(), daemon=None: (
+            self.workers.append((target, args)) or mock.Mock()
+        )
+        patcher = mock.patch.object(gui, 'threading', fake)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.gui = gui
+
+    def _window(self, size):
+        """Opens a window where the engine (X) is thinking about move one."""
+        return self.gui.TicTacToeGUI(
+            self.root,
+            size,
+            size,
+            3,
+            opponent_spec='perfect',
+            human_side=game.O,
+            show_solver=False,
+        )
+
+    def _finish_workers(self, window):
+        for target, args in self.workers:
+            target(*args)
+        window._poll()
+
+    def test_overlay_toggle_mid_think_plays_one_move(self):
+        window = self._window(3)
+        window.agent = _ScriptedAgent([4, 0])
+        window.show_solver.set(True)  # restarts the engine's think
+        self.assertEqual(len(self.workers), 2)
+        self._finish_workers(window)
+        self.assertEqual(window.board.ply, 1)
+        self.assertEqual(window.board.to_move, game.O)
+        self.assertFalse(window.thinking)
+
+    def test_new_game_mid_think_drops_the_old_move(self):
+        window = self._window(5)
+        window.rows_var.set(3)
+        window.cols_var.set(3)
+        window.new_game()
+        window.agent = _ScriptedAgent([24, 4])  # 24 is off a 3x3 board
+        self._finish_workers(window)
+        self.assertEqual(window.board.spec, (3, 3, 3))
+        self.assertEqual(window.board.cells[4], game.X)
+        self.assertEqual(window.board.ply, 1)
+
+
 class TestExamples(unittest.TestCase):
     def setUp(self):
         _require_numpy(self)
