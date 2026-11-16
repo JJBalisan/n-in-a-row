@@ -262,6 +262,24 @@ class TestRendering(unittest.TestCase):
             self.assertEqual(str(ctx.exception), msg)
 
 
+def _skip_gui(test, reason):
+    """Skips a GUI test locally, but fails it when CI is set.
+
+    Like the NumPy tests: a silent skip in CI would leave the engine-move
+    tests unrun behind a green run.
+
+    Args:
+        test: The running unittest.TestCase.
+        reason: Why the GUI cannot run.
+    """
+    if os.environ.get('CI'):
+        test.fail(
+            f'{reason} but CI is set; the GUI tests need tkinter and a '
+            'display (tests/ci.sh uses xvfb-run when there is none)'
+        )
+    test.skipTest(f'{reason} (set CI=1 to make this a failure)')
+
+
 def _import_gui(test):
     """Imports n_in_a_row.gui, skipping when tkinter is unavailable.
 
@@ -274,7 +292,7 @@ def _import_gui(test):
     try:
         from n_in_a_row import gui
     except (ImportError, SystemExit):
-        test.skipTest('tkinter is not available')
+        _skip_gui(test, 'tkinter is not available')
     return gui
 
 
@@ -361,7 +379,7 @@ class TestGuiEngineMoves(unittest.TestCase):
         try:
             self.root = gui.tk.Tk()
         except gui.tk.TclError:
-            self.skipTest('no display')
+            _skip_gui(self, 'no display')
         self.addCleanup(self.root.destroy)
         self.root.withdraw()
         # Hold each worker instead of starting it, to run it when we choose.

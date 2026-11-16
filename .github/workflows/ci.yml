@@ -30,9 +30,9 @@ jobs:
           # whole ~/.cache/uv (3 GB), which it uploaded after every job and
           # restored over the live cache. The local cache persists anyway.
           enable-cache: ${{ !vars.CI_RUNNER }}
-      # tests/ci.sh runs the suite under xvfb-run when there is no display,
-      # so the GUI tests run instead of skipping. Hosted runners only: the
-      # self-hosted one is set up by hand.
+      # tests/ci.sh runs the suite under xvfb-run when there is no display;
+      # with CI set the GUI tests fail without one. Hosted runners only: the
+      # self-hosted one is set up by hand and needs tkinter and a display.
       - name: Virtual display for the GUI tests
         if: runner.os == 'Linux' && !vars.CI_RUNNER
         run: >-

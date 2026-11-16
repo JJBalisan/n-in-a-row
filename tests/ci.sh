@@ -26,8 +26,8 @@ uvx ruff@0.16.10 check --output-format github .
 
 # step: Tests (unittest, with the test extra)
 uv sync --locked --extra test --python 3.12
-# The GUI tests open a real (withdrawn) Tk window and skip without a
-# display, so a headless Linux runner gives them a virtual one.
+# The GUI tests open a real (withdrawn) Tk window and, with CI set, fail
+# without a display, so a headless Linux runner gives them a virtual one.
 display=""
 if [ -z "${DISPLAY:-}" ] && command -v xvfb-run >/dev/null; then
   display="xvfb-run -a"
