@@ -71,6 +71,7 @@ class TicTacToeGUI:
         generation: Bumped by every new game or restart; an engine move
             computed under an older generation is stale and dropped.
         agent_lock: Held by a worker while it asks ``agent`` for a move.
+            Every game that uses the same agent object shares one lock.
         solver_values: Per-move solver results for the overlay.
     """
 
@@ -107,6 +108,7 @@ class TicTacToeGUI:
         self.thinking = False
         self.generation = 0
         self.agent_lock = threading.Lock()
+        self._agent_locks: dict[int, tuple[object, threading.Lock]] = {}
         self.queue: queue.Queue = queue.Queue()
         self.solver_values: dict[int, object] = {}
         self.solver_engine = search.Negamax(max_depth=None, time_limit=2.0)
@@ -332,10 +334,37 @@ class TicTacToeGUI:
                 self.opponent_spec = "perfect"
                 self.opp_var.set("perfect")
                 self.agent = agents.load_agent("perfect", self.rng)
-            self.agent_lock = threading.Lock()
+            self.agent_lock = self._lock_for(self.agent)
         self.solver_values = {}
         self.draw()
         self.after_move()
+
+    def _lock_for(self, agent: agents.Agent | None) -> threading.Lock:
+        """Returns the lock for asking ``agent`` for a move.
+
+        ``load_agent("mod:attr")`` can return one module-level instance to
+        every game, so a replaced game's worker may still be inside
+        ``select`` on the agent the new game uses: the lock belongs to the
+        agent, not the game. Only locks a worker holds are kept besides
+        this agent's; a worker still waiting for a dropped one belongs to a
+        replaced game and skips its search.
+
+        Args:
+            agent: The new game's opponent, or None.
+
+        Returns:
+            The lock every worker for this agent object takes.
+        """
+        self._agent_locks = {
+            key: (held, lock)
+            for key, (held, lock) in self._agent_locks.items()
+            if held is agent or lock.locked()
+        }
+        # Each entry keeps its agent alive, so its id cannot be reused.
+        entry = self._agent_locks.setdefault(
+            id(agent), (agent, threading.Lock())
+        )
+        return entry[1]
 
     def _board_spec(self) -> tuple[int, int, int]:
         """Reads rows, cols and k from the spinboxes, clamped to range.
@@ -428,8 +457,13 @@ class TicTacToeGUI:
         started = time.perf_counter()
         try:
             # An overlay toggle restarts the think with the same agent while
-            # the worker it replaced may still be running: they take turns.
+            # the worker it replaced may still be running, and a shared
+            # agent can outlive its game: they take turns. A worker whose
+            # game was replaced while it waited skips the search, so quick
+            # toggles queue no searches whose moves would be dropped.
             with lock:
+                if generation != self.generation:
+                    return
                 move = agent.select(board)
                 why = agent.explain(board)
         except Exception as exc:  # noqa: BLE001 - sent to the queue

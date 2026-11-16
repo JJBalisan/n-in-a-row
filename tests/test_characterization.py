@@ -398,24 +398,85 @@ class TestGuiEngineMoves(unittest.TestCase):
             target(*args)
         window._poll()
 
+    @staticmethod
+    def _counting(agent, lock):
+        """Records whether lock was held at each select() in the list."""
+        calls, select = [], agent.select
+
+        def counted(board):
+            calls.append(lock.locked())
+            return select(board)
+
+        agent.select = counted
+        return calls
+
     def test_overlay_toggle_mid_think_plays_one_move(self):
         agent = _ScriptedAgent([4, 0])
         self.load.side_effect = [agent]
         window = self._window(3)
-        window.show_solver.set(True)  # restarts the engine's think
-        self.assertEqual(len(self.workers), 2)
+        target, stale = self.workers.pop(0)
+        calls = self._counting(agent, stale[3])
+        select = agent.select
+
+        def mid_search(board):
+            if not calls:
+                window.show_solver.set(True)  # restarts the engine's think
+            return select(board)
+
+        agent.select = mid_search
+        target(*stale)
         # Both workers ask the one agent, so each holds its lock to do it.
-        (_, stale), (_, live) = self.workers
+        ((_, live),) = self.workers
         self.assertIs(stale[2], live[2])
         self.assertIs(stale[3], live[3])
-        lock, select, held = stale[3], agent.select, []
-        agent.select = lambda b: held.append(lock.locked()) or select(b)
         self._finish_workers(window)
-        self.assertEqual(held, [True, True])
+        self.assertEqual(calls, [True, True])
         self.assertEqual(window.board.ply, 1)
         self.assertEqual(window.board.cells[0], game.X)
         self.assertEqual(window.board.to_move, game.O)
         self.assertFalse(window.thinking)
+
+    def test_overlay_toggles_before_the_search_run_one_search(self):
+        agent = _ScriptedAgent([0, 1, 2, 3, 4])
+        self.load.side_effect = [agent]
+        window = self._window(3)
+        for _ in range(4):
+            window.show_solver.set(not window.show_solver.get())
+        self.assertEqual(len(self.workers), 5)
+        calls = self._counting(agent, self.workers[0][1][3])
+        self._finish_workers(window)
+        # The four replaced workers skip their search once they get the lock.
+        self.assertEqual(calls, [True])
+        self.assertEqual(window.board.cells[0], game.X)
+        self.assertEqual(window.board.ply, 1)
+
+    def test_games_sharing_an_agent_share_its_lock(self):
+        # load_agent('mod:attr') can hand every game one module-level agent.
+        shared, other = _ScriptedAgent([0]), _ScriptedAgent([])
+        self.load.side_effect = [shared, other, shared, shared]
+        window = self._window(3)
+        _, first = self.workers.pop(0)
+        lock = first[3]
+        lock.acquire()  # the first game's worker is mid-search
+        self.addCleanup(lambda: lock.locked() and lock.release())
+        window.new_game()
+        _, second = self.workers.pop(0)
+        # Another agent never waits on an unrelated search.
+        self.assertIsNot(second[3], lock)
+        window.new_game()
+        _, third = self.workers.pop(0)
+        self.assertIs(third[2], shared)
+        self.assertIs(third[3], lock)
+        lock.release()
+        window.new_game()
+        self.assertIs(self.workers[0][1][3], lock)
+        # The replaced games' workers skip the search; the live one plays.
+        calls = self._counting(shared, lock)
+        self.workers.insert(0, (window._think, first))
+        self._finish_workers(window)
+        self.assertEqual(calls, [True])
+        self.assertEqual(window.board.cells[0], game.X)
+        self.assertEqual(window.board.ply, 1)
 
     def test_worker_keeps_the_position_and_agent_it_started_with(self):
         seen = []
