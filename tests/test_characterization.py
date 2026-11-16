@@ -559,7 +559,7 @@ class TestGuiEngineMoves(unittest.TestCase):
                 ) as showerror:
                     window = self._window(3)
                     generation = window.generation
-                    # A cleared or garbled spinbox: IntVar.get() raises.
+                    # A cleared or garbled spinbox: reading it raises.
                     self.root.globalsetvar(str(getattr(window, name)), text)
                     window.new_game()
                 showerror.assert_called_once()
@@ -571,6 +571,38 @@ class TestGuiEngineMoves(unittest.TestCase):
                 self.assertEqual(window.board.cells[4], game.X)
                 self.assertEqual(window.board.ply, 1)
                 self.assertFalse(window.thinking)
+
+    def test_fractional_size_shows_the_dialog(self):
+        # The dialog asks for whole numbers, so 4.9 must not become 4.
+        for name in ('rows_var', 'cols_var', 'k_var'):
+            with self.subTest(control=name):
+                self.workers.clear()
+                self.load.reset_mock()
+                self.load.side_effect = [_ScriptedAgent([4])]
+                with mock.patch.object(
+                    self.gui.messagebox, 'showerror'
+                ) as showerror:
+                    window = self._window(5)
+                    generation = window.generation
+                    self.root.globalsetvar(str(getattr(window, name)), '4.9')
+                    window.new_game()
+                showerror.assert_called_once()
+                self.assertEqual(window.generation, generation)
+                self.assertEqual(window.board.spec, (5, 5, 3))
+                self.assertEqual(self.load.call_count, 1)
+
+    def test_new_game_shows_the_clamped_size(self):
+        self.load.side_effect = [_ScriptedAgent([]), _ScriptedAgent([])]
+        window = self._window(3)
+        window.rows_var.set(99)
+        window.cols_var.set(1)
+        window.k_var.set(50)
+        window.new_game()
+        self.assertEqual(window.board.spec, (15, 3, 15))
+        self.assertEqual(
+            (window.rows_var.get(), window.cols_var.get(), window.k_var.get()),
+            (15, 3, 15),
+        )
 
 
 class TestExamples(unittest.TestCase):

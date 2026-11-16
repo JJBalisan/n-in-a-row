@@ -319,6 +319,9 @@ class TicTacToeGUI:
         self.generation += 1
         self.thinking = False
         if not keep_position:
+            # Show the size actually played, not what was typed.
+            self.rows_var.set(rows)
+            self.cols_var.set(cols)
             self.k_var.set(k)
             self.board = game.Board(rows, cols, k)
             self.opponent_spec = self.opp_var.get().strip() or "perfect"
@@ -373,13 +376,29 @@ class TicTacToeGUI:
             A (rows, cols, k) tuple.
 
         Raises:
-            tk.TclError: A spinbox does not hold a number.
-            OverflowError: A spinbox holds an infinity.
+            tk.TclError: A spinbox does not hold a whole number.
         """
-        rows = max(3, min(15, self.rows_var.get()))
-        cols = max(3, min(15, self.cols_var.get()))
-        k = max(2, min(max(rows, cols), self.k_var.get()))
+        rows = max(3, min(15, self._whole(self.rows_var)))
+        cols = max(3, min(15, self._whole(self.cols_var)))
+        k = max(2, min(max(rows, cols), self._whole(self.k_var)))
         return rows, cols, k
+
+    def _whole(self, var: tk.IntVar) -> int:
+        """Reads a spinbox's variable as a whole number.
+
+        ``IntVar.get()`` falls back to a float and truncates it, so 4.9
+        would quietly become 4; Tcl's own integer parse refuses it.
+
+        Args:
+            var: The spinbox's variable.
+
+        Returns:
+            Its value.
+
+        Raises:
+            tk.TclError: The variable does not hold a whole number.
+        """
+        return self.root.tk.getint(self.root.globalgetvar(str(var)))
 
     def undo(self) -> None:
         """Takes back the last move, or the last two against an agent."""
