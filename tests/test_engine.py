@@ -101,6 +101,10 @@ class TestBoard(unittest.TestCase):
         self.assertNotIn(2, b.winning_moves(game.O))
 
 
+class _InterruptError(Exception):
+    """Stands in for any non-_TimeUp error raised mid-search."""
+
+
 class TestSearch(unittest.TestCase):
     def test_empty_3x3_is_a_draw(self):
         r = search.solve(game.Board())
@@ -241,6 +245,67 @@ class TestSearch(unittest.TestCase):
             self.assertFalse(r.exact, depth)
             self.assertLess(abs(r.value), search.WIN // 2, depth)
             self.assertTrue(r.outcome.startswith("eval "), depth)
+
+    @staticmethod
+    def _interrupted_after(nodes, error):
+        """Patches _negamax to raise ``error`` once ``nodes`` are visited."""
+        real = search.Negamax._negamax
+
+        def negamax(self, board, depth, alpha, beta):
+            if self.nodes >= nodes:
+                raise error()
+            return real(self, board, depth, alpha, beta)
+
+        return mock.patch.object(search.Negamax, "_negamax", negamax)
+
+    def _assert_board_restored(self, before, after):
+        self.assertEqual(after.moves_played(), before.moves_played())
+        self.assertEqual(after.cells, before.cells)
+        self.assertEqual(after.to_move, before.to_move)
+        self.assertEqual(after.hash, before.hash)
+
+    def test_interrupted_search_leaves_the_board_as_found(self):
+        """Issue #32: only _TimeUp popped the root move.
+
+        Any other exception (or Ctrl-C) after 50 nodes on [4, 0] left the
+        board as [4, 0, 5], the side to move flipped.
+        """
+        for error in (_InterruptError, KeyboardInterrupt):
+            with self.subTest(error=error.__name__):
+                b = game.Board.from_moves([4, 0])
+                before = b.copy()
+                patch = self._interrupted_after(50, error)
+                with patch, self.assertRaises(error):
+                    search.Negamax().search(b)
+                self._assert_board_restored(before, b)
+
+    def test_interrupted_evaluate_moves_leaves_the_board_as_found(self):
+        """Issue #32: evaluate_moves popped the leaked stone, not its own."""
+        b = game.Board.from_moves([4, 0])
+        before = b.copy()
+        patch = self._interrupted_after(50, _InterruptError)
+        with patch, self.assertRaises(_InterruptError):
+            search.Negamax().evaluate_moves(b)
+        self._assert_board_restored(before, b)
+
+    def test_interrupt_at_any_node_leaves_the_board_as_found(self):
+        """Issue #32: the root move is popped wherever the error lands."""
+        for nodes in (1, 2, 10, 200):
+            with self.subTest(nodes=nodes):
+                b = game.Board.from_moves([4, 0, 1])
+                before = b.copy()
+                patch = self._interrupted_after(nodes, _InterruptError)
+                with patch, self.assertRaises(_InterruptError):
+                    search.Negamax().search(b)
+                self._assert_board_restored(before, b)
+
+    def test_time_cut_leaves_the_board_as_found(self):
+        """The _TimeUp path pops the root move once, now in a finally."""
+        b = game.Board.from_moves([10, 18, 8, 7, 1, 19, 2], 4, 5, 4)
+        before = b.copy()
+        r = self._cut_search(b, 2047)
+        self.assertFalse(r.exact)  # the cut really happened
+        self._assert_board_restored(before, b)
 
 
 class TestAgents(unittest.TestCase):

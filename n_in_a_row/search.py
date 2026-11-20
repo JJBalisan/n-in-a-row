@@ -219,9 +219,9 @@ class Negamax:
             try:
                 value = -self._negamax(board, depth - 1, -beta, -alpha)
             except _TimeUp:
-                board.pop()
                 return best_move, best_value, False
-            board.pop()
+            finally:
+                board.pop()
             if value > best_value:
                 best_value, best_move = value, m
             if value > alpha:  # noqa: PLR1730 (hot loop; avoids a max() call)
