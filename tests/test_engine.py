@@ -288,6 +288,25 @@ class TestSearch(unittest.TestCase):
             search.Negamax().evaluate_moves(b)
         self._assert_board_restored(before, b)
 
+    def test_interrupt_at_any_node_leaves_the_board_as_found(self):
+        """Issue #32: the root move is popped wherever the error lands."""
+        for nodes in (1, 2, 10, 200):
+            with self.subTest(nodes=nodes):
+                b = game.Board.from_moves([4, 0, 1])
+                before = b.copy()
+                patch = self._interrupted_after(nodes, _InterruptError)
+                with patch, self.assertRaises(_InterruptError):
+                    search.Negamax().search(b)
+                self._assert_board_restored(before, b)
+
+    def test_time_cut_leaves_the_board_as_found(self):
+        """The _TimeUp path pops the root move once, now in a finally."""
+        b = game.Board.from_moves([10, 18, 8, 7, 1, 19, 2], 4, 5, 4)
+        before = b.copy()
+        r = self._cut_search(b, 2047)
+        self.assertFalse(r.exact)  # the cut really happened
+        self._assert_board_restored(before, b)
+
 
 class TestAgents(unittest.TestCase):
     def test_specs_load(self):
