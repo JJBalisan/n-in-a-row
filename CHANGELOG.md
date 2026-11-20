@@ -12,6 +12,26 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-11-20
+
+### Fixed
+
+- A search cut short by a time limit keeps its last completed depth, so
+  the engine no longer plays a losing move and calls it exact (#30).
+- The k >= 8 heuristic stays out of the mate band, so it no longer
+  reports false forced wins (#30).
+- The GUI drops engine moves computed for a game that has been replaced,
+  including across the "Cannot load opponent" dialog (#30).
+- New game checks the size controls first: bad input shows a dialog and
+  leaves the current game and its search alone (#30).
+- GUI engine workers get their board and agent up front, and games that
+  share an agent no longer search on it at once (#30).
+- Under `CI=1` the GUI tests fail, rather than skip, without tkinter or a
+  display; hosted CI runs them under xvfb with uv's own Python (#30).
+- A search stopped by any error or Ctrl-C, not only its time limit, now
+  takes back its root move, so `search`, `evaluate_moves` and the labeller
+  leave the caller's board as they found it (#32).
+
 ## [1.1.3] - 2026-11-03
 
 ### Changed
@@ -104,7 +124,8 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.0...v1.1.1
