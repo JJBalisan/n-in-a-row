@@ -478,10 +478,8 @@ def main(argv: list[str] | None = None) -> int:
     except agents.Undo:
         print("error: undo only works in play", file=sys.stderr)
         return 2
-    except SystemExit as exc:
+    except arena.HumanQuit as exc:
         # A human seat quitting or running out of input, outside play.
-        if exc.code is not None and not isinstance(exc.code, str):
-            raise
         print(exc.code, file=sys.stderr)
         return 0
     except KeyboardInterrupt:

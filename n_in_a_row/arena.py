@@ -70,6 +70,15 @@ class GameRecord:
         )
 
 
+class HumanQuit(SystemExit):
+    """A :class:`~n_in_a_row.agents.HumanAgent` seat's own quit.
+
+    Raised in place of the plain SystemExit the human seat raises, so a
+    caller can end quietly on it while any other agent's exit still
+    leaves the program as it would have.
+    """
+
+
 def play_game(
     x_agent: agents.Agent,
     o_agent: agents.Agent,
@@ -91,6 +100,9 @@ def play_game(
 
     Returns:
         The move list and the result.
+
+    Raises:
+        HumanQuit: When a human seat quits or its input ends.
     """
     board = game.Board(rows, cols, k)
     players = {game.X: x_agent, game.O: o_agent}
@@ -100,7 +112,13 @@ def play_game(
         a.reset(board)
     while not board.is_terminal:
         mover = board.to_move
-        move = players[mover].select(board)
+        seat = players[mover]
+        try:
+            move = seat.select(board)
+        except SystemExit as exc:
+            if not isinstance(seat, agents.HumanAgent):
+                raise
+            raise HumanQuit(exc.code) from exc
         board.push(move)
         for a in distinct:
             a.observe(board, move)
