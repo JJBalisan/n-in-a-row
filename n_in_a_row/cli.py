@@ -88,23 +88,23 @@ def cmd_play(args: argparse.Namespace) -> int:
     while not board.is_terminal:
         print(board.render(color=color))
         print()
-        if board.to_move == human_side:
-            try:
-                move = human.select(board)
-            except agents.Undo:
-                if board.ply >= 2:
-                    board.pop()
-                    board.pop()
-                    print("\n(took back a move)\n")
-                else:
-                    print("\n(nothing to take back)\n")
-                continue
-            except SystemExit as exc:
-                print(exc)
-                return 0
-        else:
-            t = time.perf_counter()
-            move = engine.select(board)
+        mover = board.to_move
+        seat = human if mover == human_side else engine
+        t = time.perf_counter()
+        try:
+            move = seat.select(board)
+        except agents.Undo:
+            if board.ply >= 2:
+                board.pop()
+                board.pop()
+                print("\n(took back a move)\n")
+            else:
+                print("\n(nothing to take back)\n")
+            continue
+        except SystemExit as exc:
+            print(exc)
+            return 0
+        if mover != human_side:
             why = engine.explain(board)
             print(
                 f"{engine.name} plays {board.label(move)}"
@@ -300,6 +300,7 @@ def cmd_bench(args: argparse.Namespace) -> int:
         0.
     """
     rows, cols, k = _shape(args)
+    k = game.Board(rows, cols, k).k  # The Board's own default for None.
     print(f"board {rows}x{cols}, {k} in a row")
 
     t = time.perf_counter()
@@ -470,6 +471,15 @@ def main(argv: list[str] | None = None) -> int:
     except game.InvalidMove as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    except agents.Undo:
+        print("error: undo only works in play", file=sys.stderr)
+        return 2
+    except SystemExit as exc:
+        # A human seat quitting or running out of input, outside play.
+        if exc.code is not None and not isinstance(exc.code, str):
+            raise
+        print(exc.code, file=sys.stderr)
+        return 0
     except KeyboardInterrupt:
         print()
         return 130

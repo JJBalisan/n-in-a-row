@@ -46,6 +46,29 @@ class GameRecord:
             }
         )
 
+    @classmethod
+    def from_json(cls, line: str) -> GameRecord:
+        """Reads a record back from a line written by :meth:`to_json`.
+
+        Args:
+            line: One line of JSON.
+
+        Returns:
+            The record, equal to the one that was written.
+
+        Raises:
+            ValueError: If the line is not JSON.
+            KeyError: If a field is missing.
+        """
+        data = json.loads(line)
+        return cls(
+            data["rows"],
+            data["cols"],
+            data["k"],
+            list(data["moves"]),
+            data["winner"],
+        )
+
 
 def play_game(
     x_agent: agents.Agent,
@@ -71,13 +94,15 @@ def play_game(
     """
     board = game.Board(rows, cols, k)
     players = {game.X: x_agent, game.O: o_agent}
-    for a in players.values():
+    # One object in both seats gets each hook once; equal objects do not merge.
+    distinct = list({id(a): a for a in players.values()}.values())
+    for a in distinct:
         a.reset(board)
     while not board.is_terminal:
         mover = board.to_move
         move = players[mover].select(board)
         board.push(move)
-        for a in players.values():
+        for a in distinct:
             a.observe(board, move)
         if on_move is not None:
             on_move(board, mover, move)
@@ -219,9 +244,14 @@ def selfplay(
         One record per game.
     """
     rng = random.Random(seed)
+    # Built once: a built-in agent shares the Random it is given with every
+    # part of itself, so reseeding that one object reseeds the whole agent.
+    rng_a, rng_b = random.Random(), random.Random()
+    a = agents.load_agent(agent_spec, rng_a)
+    b = agents.load_agent(agent_spec, rng_b)
     for _ in range(games):
-        a = agents.load_agent(agent_spec, random.Random(rng.getrandbits(32)))
-        b = agents.load_agent(agent_spec, random.Random(rng.getrandbits(32)))
+        rng_a.seed(rng.getrandbits(32))
+        rng_b.seed(rng.getrandbits(32))
         yield play_game(a, b, rows, cols, k)
 
 
