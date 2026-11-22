@@ -78,7 +78,10 @@ python3 -m n_in_a_row.gui --opponent mymodule:agent
 ```
 
 `module:attribute` may resolve to an `Agent` instance, an `Agent` subclass, or a
-zero-argument factory returning either.
+factory returning either. A factory (or class) with a parameter named `rng`
+is called as `factory(rng=rng)` with the `random.Random` the CLI, arena or
+`load_agent(spec, rng)` holds, so a seeded run stays seeded; one without it is
+called with no arguments, as before.
 
 ## The RL environment
 
@@ -198,8 +201,8 @@ engine across positions; every tic-tac-toe label is checked against
 brute-force minimax, mate distance included.
 
 Zoo agents have specs of their own, read by `zoo.load` (anything else goes
-to `load_agent`), and zero-argument factories that work as
-`module:factory` specs anywhere:
+to `load_agent`), and factories (each takes an optional `rng`)
+that work as `module:factory` specs anywhere:
 
 | spec | plays |
 |---|---|

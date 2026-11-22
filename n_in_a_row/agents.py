@@ -8,6 +8,7 @@ all use your net without knowing anything about it.
 from __future__ import annotations
 
 import importlib
+import inspect
 import random
 from typing import Callable
 
@@ -289,12 +290,15 @@ def load_agent(spec: str, rng: random.Random | None = None) -> Agent:
         human                  prompts on stdin
 
     Anything else is read as ``module.path:attribute``. The attribute may be an
-    :class:`Agent`, an Agent subclass, or a zero-argument factory returning one
-    (or returning a ``fn(board) -> int``, which is wrapped).
+    :class:`Agent`, an Agent subclass, or a factory returning an Agent or an
+    Agent subclass (or a ``fn(board) -> int``, which is wrapped). A factory,
+    or a class, that has a parameter named ``rng`` is called with ``rng=rng``,
+    so a seeded run stays seeded; one without it is called with no arguments.
 
     Args:
         spec: The agent spec.
-        rng: Shared by the built-ins; a fresh unseeded one if None.
+        rng: Shared by the built-ins and passed to factories that take an
+            ``rng``; a fresh unseeded one if None.
 
     Returns:
         A new agent, or the attribute itself when it is an Agent instance.
@@ -313,7 +317,7 @@ def load_agent(spec: str, rng: random.Random | None = None) -> Agent:
     builtin = _load_builtin(head, tail, rng)
     if builtin is not None:
         return builtin
-    return _load_attribute(spec, head, tail)
+    return _load_attribute(spec, head, tail, rng)
 
 
 def _load_builtin(head: str, tail: str, rng: random.Random) -> Agent | None:
@@ -351,7 +355,13 @@ def _load_builtin(head: str, tail: str, rng: random.Random) -> Agent | None:
 
 
 def _load_noisy(tail: str, rng: random.Random) -> Agent:
-    """Builds ``noisy:P:AGENT``, folding P into a negamax agent's epsilon.
+    """Builds ``noisy:P:AGENT``, folding P into a fresh built-in negamax.
+
+    Only a negamax agent this module has just built from a ``perfect``,
+    ``negamax:D`` or ``time:S`` spec takes P as its epsilon. Anything else
+    (a ``module:attribute`` agent, which may be shared or override
+    ``select``, or another ``noisy:`` agent, whose own epsilon P must
+    compound with) is wrapped and left untouched.
 
     Args:
         tail: ``P:AGENT``; AGENT defaults to ``perfect``.
@@ -365,21 +375,27 @@ def _load_noisy(tail: str, rng: random.Random) -> Agent:
         ValueError: If P does not parse.
     """
     eps_s, _, rest = tail.partition(":")
-    base = load_agent(rest or "perfect", rng)
-    if isinstance(base, NegamaxAgent):
-        base.epsilon = float(eps_s)
+    rest = rest or "perfect"
+    epsilon = float(eps_s)
+    base = load_agent(rest, rng)
+    built_in = rest.partition(":")[0].strip() in ("perfect", "negamax", "time")
+    if built_in and type(base) is NegamaxAgent:
+        base.epsilon = epsilon
         base.name = f"noisy:{eps_s}:{base.name}"
         return base
-    return NoisyAgent(base, float(eps_s), rng)
+    return NoisyAgent(base, epsilon, rng)
 
 
-def _load_attribute(spec: str, head: str, tail: str) -> Agent:
+def _load_attribute(
+    spec: str, head: str, tail: str, rng: random.Random
+) -> Agent:
     """Loads a ``module.path:attribute`` spec.
 
     Args:
         spec: The whole spec, for messages and a wrapped function's name.
         head: The module path.
         tail: The attribute name.
+        rng: Passed to a factory or class that has an ``rng`` parameter.
 
     Returns:
         A new agent, or the attribute itself when it is an Agent instance.
@@ -401,10 +417,12 @@ def _load_attribute(spec: str, head: str, tail: str) -> Agent:
     obj = getattr(module, tail)
     if isinstance(obj, Agent):
         return obj
-    if isinstance(obj, type) and issubclass(obj, Agent):
-        return obj()
+    if _is_agent_class(obj):
+        return _call(obj, rng)
     if callable(obj):
-        made = obj()
+        made = _call(obj, rng)
+        if _is_agent_class(made):
+            made = _call(made, rng)
         if isinstance(made, Agent):
             return made
         if callable(made):
@@ -412,8 +430,38 @@ def _load_attribute(spec: str, head: str, tail: str) -> Agent:
     raise TypeError(f"{spec} did not yield an Agent")
 
 
+def _is_agent_class(obj: object) -> bool:
+    """Returns whether ``obj`` is an :class:`Agent` subclass."""
+    return isinstance(obj, type) and issubclass(obj, Agent)
+
+
+def _call(factory: Callable[..., object], rng: random.Random) -> object:
+    """Calls a factory or class, handing it ``rng`` if it has that parameter.
+
+    Args:
+        factory: A zero-argument callable, or one with an ``rng`` parameter.
+        rng: The generator to pass.
+
+    Returns:
+        What the callable returns.
+    """
+    try:
+        params = inspect.signature(factory).parameters
+    except (TypeError, ValueError):  # No introspectable signature.
+        params = {}
+    if "rng" in params:
+        return factory(rng=rng)
+    return factory()
+
+
 class NoisyAgent(Agent):
-    """Plays a random move with probability epsilon, else defers to another."""
+    """Plays a random move with probability epsilon, else defers to another.
+
+    Attributes:
+        base: The agent deferred to; it is sent every reset and observe.
+        epsilon: Probability of a random move.
+        played_random: Whether the latest :meth:`select` was random.
+    """
 
     def __init__(
         self, base: Agent, epsilon: float, rng: random.Random | None = None
@@ -428,14 +476,27 @@ class NoisyAgent(Agent):
         self.base = base
         self.epsilon = epsilon
         self.rng = rng or random.Random()
+        self.played_random = False
         self.name = f"noisy:{epsilon:g}:{base.name}"
 
     def select(self, board: game.Board) -> int:
         """Returns a random legal move with p=epsilon, else the base's move."""
-        if self.rng.random() < self.epsilon:
+        self.played_random = self.rng.random() < self.epsilon
+        if self.played_random:
             return self.rng.choice(board.legal_moves())
         return self.base.select(board)
 
+    def reset(self, board: game.Board) -> None:
+        """Passes the new game on to the base agent."""
+        self.played_random = False
+        self.base.reset(board)
+
+    def observe(self, board: game.Board, move: int) -> None:
+        """Passes every move on to the base agent."""
+        self.base.observe(board, move)
+
     def explain(self, board: game.Board) -> str | None:
-        """Returns the base agent's rationale."""
+        """Returns the base agent's rationale, or says the move was random."""
+        if self.played_random:
+            return "played at random (epsilon)"
         return self.base.explain(board)
