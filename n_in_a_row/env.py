@@ -201,6 +201,8 @@ class TicTacToeEnv:
                 True,
                 {"illegal": True, "error": str(exc)},
             )
+        if self.opponent is not None:
+            self.opponent.observe(self.board, int(action))
 
         if self.board.is_terminal:
             return self.observation(), self._reward(mover), True, self._info()
@@ -220,6 +222,7 @@ class TicTacToeEnv:
     def _opponent_move(self) -> None:
         move = self.opponent.select(self.board)
         self.board.push(move)
+        self.opponent.observe(self.board, move)
 
     def _reward(self, mover: int) -> float:
         r = self.board.result_for(mover)
@@ -328,7 +331,6 @@ class BatchEnv:
         self.n = n
         self.observation_shape = self.envs[0].observation_shape
         self.n_actions = self.envs[0].n_actions
-        self._alternate = 0
 
     def reset(self) -> np.ndarray:
         """Resets every game; returns observations stacked on axis 0."""
@@ -339,7 +341,7 @@ class BatchEnv:
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[dict]]:
         """Steps every game, resetting the ones that finish.
 
-        Every second game to finish swaps sides on reset (with an opponent).
+        Each game swaps sides every time it finishes (with an opponent).
 
         Args:
             actions: One cell index per game.
@@ -352,8 +354,7 @@ class BatchEnv:
         for env, a in zip(self.envs, actions):
             o, r, d, i = env.step(int(a))
             if d:
-                self._alternate += 1
-                o = env.reset(swap_sides=self._alternate % 2 == 0)
+                o = env.reset(swap_sides=True)
             obs.append(o)
             rewards.append(r)
             dones.append(d)
