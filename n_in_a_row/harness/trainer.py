@@ -121,6 +121,14 @@ class PolicyAgent(agents.Agent):
     def select(self, board: game.Board) -> int:
         """Returns the network's move."""
         x = rl_env.encode(board).reshape(1, -1).astype(np.float64)
+        if (
+            x.shape[1] != self.policy.W1.shape[0]
+            or self.policy.W2.shape[1] != board.size
+        ):
+            raise ValueError(
+                f"weights fit a board of {self.policy.W2.shape[1]} cells, "
+                f"not {board.rows}x{board.cols}"
+            )
         m = rl_env.legal_mask(board)[None, :]
         p = self.policy.probs(x, m)[0]
         if self.greedy:
@@ -158,14 +166,18 @@ def solver_targets(depth: int | None = None) -> TargetFn:
     """Makes the default teacher: uniform over the engine's best moves.
 
     Args:
-        depth: Search depth; None solves exactly where feasible.
+        depth: Search depth; None solves exactly where feasible. A
+            depth-limited score depends on the table it was searched
+            with, so each position gets a fresh engine and its label does
+            not depend on the order of the positions.
 
     Returns:
         A target function whose value is the sign of the best score.
     """
-    engine = search.Negamax(max_depth=depth)
+    shared = search.Negamax(max_depth=depth) if depth is None else None
 
     def targets(b: game.Board) -> tuple[np.ndarray, float] | None:
+        engine = shared or search.Negamax(max_depth=depth)
         values = engine.evaluate_moves(b)
         if not values:
             return None
