@@ -100,22 +100,22 @@ class TestOverlayReadsLandOnTheirBoard(unittest.TestCase):
         return {i: r.value for i, r in window.solver_values.items()}
 
     def test_stale_read_after_k_change_does_not_replace_live_one(self):
-        # The issue's scenario: a 3x3 k=3 read finishes after New game with
-        # k=2, after the k=2 read has already landed.
-        window = self._window(3, 3, 3)
+        # The issue's scenario, with k kept at 3 or more: a 4x4 k=4 read
+        # finishes after New game with k=3, after the k=3 read has landed.
+        window = self._window(4, 4, 4)
         (stale,) = self.workers
         self.workers.clear()
 
         def mid_search():
-            self._new_game(window, 3, 3, 2)
+            self._new_game(window, 4, 4, 3)
             (live,) = self.workers
             self._run(live)
 
         self.on_read = mid_search
         self._run(stale)
         window._poll()
-        self.assertEqual(window.board.spec, (3, 3, 2))
-        want = {i: _marker((3, 3, 2)) for i in range(9)}
+        self.assertEqual(window.board.spec, (4, 4, 3))
+        want = {i: _marker((4, 4, 3)) for i in range(16)}
         self.assertEqual(self._values(window), want)
 
     def test_stale_read_is_not_applied_to_a_new_shape(self):
@@ -130,13 +130,13 @@ class TestOverlayReadsLandOnTheirBoard(unittest.TestCase):
         self.assertEqual(self._values(window), {})
 
     def test_stale_read_is_not_applied_after_k_change(self):
-        window = self._window(3, 3, 3)
+        window = self._window(4, 4, 4)
         (stale,) = self.workers
         self.workers.clear()
-        self.on_read = lambda: self._new_game(window, 3, 3, 2)
+        self.on_read = lambda: self._new_game(window, 4, 4, 3)
         self._run(stale)
         window._poll()
-        self.assertEqual(window.board.spec, (3, 3, 2))
+        self.assertEqual(window.board.spec, (4, 4, 3))
         self.assertEqual(self._values(window), {})
 
     def test_live_read_still_lands(self):
