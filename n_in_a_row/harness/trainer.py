@@ -121,7 +121,10 @@ class PolicyAgent(agents.Agent):
     def select(self, board: game.Board) -> int:
         """Returns the network's move."""
         x = rl_env.encode(board).reshape(1, -1).astype(np.float64)
-        if x.shape[1] != self.policy.W1.shape[0]:
+        if (
+            x.shape[1] != self.policy.W1.shape[0]
+            or self.policy.W2.shape[1] != board.size
+        ):
             raise ValueError(
                 f"weights fit a board of {self.policy.W2.shape[1]} cells, "
                 f"not {board.rows}x{board.cols}"
