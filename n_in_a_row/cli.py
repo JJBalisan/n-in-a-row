@@ -94,6 +94,8 @@ def cmd_play(args: argparse.Namespace) -> int:
         try:
             move = seat.select(board)
         except agents.Undo:
+            if not isinstance(seat, agents.HumanAgent):
+                raise
             if board.ply >= 2:
                 board.pop()
                 board.pop()
@@ -102,6 +104,8 @@ def cmd_play(args: argparse.Namespace) -> int:
                 print("\n(nothing to take back)\n")
             continue
         except SystemExit as exc:
+            if not isinstance(seat, agents.HumanAgent):
+                raise  # An agent's own exit code is kept.
             print(exc)
             return 0
         if mover != human_side:
