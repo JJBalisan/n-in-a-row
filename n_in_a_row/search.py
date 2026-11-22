@@ -94,7 +94,12 @@ class Negamax:
                 move, up to SOFT_EXACT_LIMIT.
             time_limit: Seconds per search; None means no limit.
             tt_size: The most transposition-table entries to keep.
+
+        Raises:
+            ValueError: If max_depth is below 1.
         """
+        if max_depth is not None and max_depth < 1:
+            raise ValueError(f"max_depth must be at least 1, got {max_depth}")
         self.max_depth = max_depth
         self.time_limit = time_limit
         self.tt_size = tt_size
@@ -119,7 +124,8 @@ class Negamax:
 
         Returns:
             The result of the deepest iteration that completed. A pass the
-            time limit cut short is discarded, never reported as exact.
+            time limit cut short is discarded, unless it already proved a
+            win; any other cut pass is never reported as exact.
         """
         started = time.perf_counter()
         self.nodes = 0
@@ -139,8 +145,15 @@ class Negamax:
 
         empties = len(board.legal_moves())
         if empties == 0:
+            # A finished game is a loss for the side to move if it was won.
+            lost = board.winner not in (None, game.DRAW)
             return SearchResult(
-                None, 0.0, 0, 0, True, time.perf_counter() - started
+                None,
+                -float(WIN) if lost else 0.0,
+                0,
+                0,
+                True,
+                time.perf_counter() - started,
             )
 
         if self.max_depth is None:
@@ -149,6 +162,7 @@ class Negamax:
             target = min(self.max_depth, empties)
 
         best_move, best_value, reached = None, -float("inf"), 0
+        cut_win = False
         # Iterative deepening: each pass seeds the transposition table with good
         # move ordering for the next, and a time limit can stop us mid-way with
         # a usable answer already in hand.
@@ -157,8 +171,12 @@ class Negamax:
             if not completed:
                 # A cut pass searched only some root moves, in static order,
                 # so its best so far may be a refuted move: keep the last
-                # completed pass, and only fall back if there is none.
-                if best_move is None:
+                # completed pass, and only fall back if there is none. A
+                # positive mate score is the exception: a win is proven by
+                # the one move that reached it.
+                if value > WIN // 2:
+                    best_move, best_value, cut_win = move, value, True
+                elif best_move is None:
                     best_move, best_value = move, value
                 break
             best_move, best_value = move, value
@@ -170,8 +188,8 @@ class Negamax:
         # game-theoretic regardless of the horizon. A drawish score is only
         # trustworthy if we searched every remaining move. Either way it must
         # come from a pass that completed.
-        proven = reached > 0 and (
-            abs(best_value) > WIN // 2 or reached >= empties
+        proven = cut_win or (
+            reached > 0 and (abs(best_value) > WIN // 2 or reached >= empties)
         )
 
         return SearchResult(
