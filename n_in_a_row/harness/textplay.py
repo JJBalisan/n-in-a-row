@@ -208,6 +208,16 @@ class TextAgent(agents.Agent):
         self.failures = 0
         self.fallbacks = 0
 
+    def reset(self, board: game.Board) -> None:
+        """Passes the new game on to the fallback agent, if there is one."""
+        if self.fallback is not None:
+            self.fallback.reset(board)
+
+    def observe(self, board: game.Board, move: int) -> None:
+        """Passes every move on to the fallback agent, if there is one."""
+        if self.fallback is not None:
+            self.fallback.observe(board, move)
+
     def select(self, board: game.Board) -> int:
         """Asks the model for a move, retrying on a bad reply.
 
