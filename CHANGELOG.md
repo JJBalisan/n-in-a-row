@@ -12,6 +12,54 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-22
+
+### Changed
+
+- `module:factory` specs: a factory or class with an `rng` parameter is
+  called with the loader's `rng`, and the zoo factories (`saboteur`,
+  `stealth`, `sandbagger`, `locked`, `noisy`) take it, so a seeded run
+  plays the same games. Zero-argument factories work as before (#51).
+
+### Fixed
+
+- `Negamax.search` reports a won position as a loss for the side to move,
+  not a draw (#31).
+- `Negamax` rejects a `max_depth` below 1 when it is built, so `negamax:0`
+  no longer plays as a search that never looks ahead (#39).
+- A search cut by the time limit keeps a win its last pass already
+  proved, instead of falling back to an earlier, weaker pass (#62).
+- `NoisyAgent` forwards `reset` and `observe` to the agent it wraps and no
+  longer explains a random move with the base agent's rationale (#33).
+- `noisy:P:AGENT` no longer edits the agent a `module:attribute` spec
+  resolves to, and folds P into the epsilon only of a negamax agent it
+  built itself from `perfect`, `negamax:D` or `time:S`, so `noisy:` over a
+  `module:attribute` or over another `noisy:` wraps and compounds (#45).
+- A `module:factory` spec whose factory returns an `Agent` subclass now
+  instantiates it instead of failing on the first move (#46).
+- The GUI's solver overlay shows a read only on the game, board shape and
+  `k` it was computed for, so a late read no longer tags another board
+  (#34).
+- The GUI keeps the engine's explanation of its move in the detail line
+  until the position changes (#50).
+- The GUI refuses a size spinbox text over 12 characters before Tcl
+  parses it, instead of stalling on a huge number (#63).
+- `BatchEnv` swaps each game's side every time that game finishes,
+  instead of sharing one counter across games that finish in the same
+  step (#36).
+- `TicTacToeEnv` calls `opponent.observe` after every move by either
+  side, as `arena.play_game` does (part of #42; the unused `seed`
+  argument is still open).
+- `solver_targets(depth=N)` labels every position with a fresh search, so a
+  depth-limited label no longer depends on which positions were labelled
+  before it (#37).
+- `PolicyAgent` raises a `ValueError` naming the board when its weights were
+  trained for a different board size, instead of NumPy's matmul error (#47).
+- `TextAgent` passes `reset` and `observe` on to its fallback agent, so a
+  stateful fallback sees every game and move (#40).
+- `n_in_a_row.__version__` matches the version in `pyproject.toml`
+  instead of reporting 1.0.0 (#54).
+
 ## [1.1.4] - 2026-11-20
 
 ### Fixed
@@ -124,7 +172,8 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.1...v1.1.2
