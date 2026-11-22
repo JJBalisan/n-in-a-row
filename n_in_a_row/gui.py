@@ -30,6 +30,10 @@ except ImportError as exc:  # pragma: no cover
 
 from n_in_a_row import agents, game, search, version
 
+# Longest spinbox text handed to Tcl (the spinboxes allow 15; 12 leaves room
+# for padding, a sign or leading zeros).
+_MAX_NUMBER_CHARS = 12
+
 BG = "#12150F"
 GRID = "#3A4235"
 CELL = "#191D16"
@@ -73,6 +77,9 @@ class TicTacToeGUI:
         agent_lock: Held by a worker while it asks ``agent`` for a move.
             Every game that uses the same agent object shares one lock.
         solver_values: Per-move solver results for the overlay.
+        why: The engine's explanation of its last move, shown while the
+            board is still at the position that move produced.
+        why_ply: The ply count of that position.
     """
 
     def __init__(
@@ -111,6 +118,8 @@ class TicTacToeGUI:
         self._agent_locks: dict[int, tuple[object, threading.Lock]] = {}
         self.queue: queue.Queue = queue.Queue()
         self.solver_values: dict[int, object] = {}
+        self.why = ""
+        self.why_ply = -1
         self.solver_engine = search.Negamax(max_depth=None, time_limit=2.0)
         self.hover: int | None = None
 
@@ -318,6 +327,7 @@ class TicTacToeGUI:
         # error dialog below.
         self.generation += 1
         self.thinking = False
+        self.why = ""
         if not keep_position:
             # Show the size actually played, not what was typed.
             self.rows_var.set(rows)
@@ -397,8 +407,14 @@ class TicTacToeGUI:
 
         Raises:
             tk.TclError: The variable does not hold a whole number.
+            ValueError: The text is longer than any size could need; Tcl's
+                integer parse is quadratic in the digit count, so it is
+                refused before it reaches Tcl.
         """
-        return self.root.tk.getint(self.root.globalgetvar(str(var)))
+        text = str(self.root.globalgetvar(str(var))).strip()
+        if len(text) > _MAX_NUMBER_CHARS:
+            raise ValueError("number too long")
+        return self.root.tk.getint(text)
 
     def undo(self) -> None:
         """Takes back the last move, or the last two against an agent."""
@@ -464,7 +480,11 @@ class TicTacToeGUI:
                 daemon=True,
             ).start()
         elif self.show_solver.get():
-            threading.Thread(target=self._read_position, daemon=True).start()
+            threading.Thread(
+                target=self._read_position,
+                args=(self.generation, self.board.copy()),
+                daemon=True,
+            ).start()
 
     def _think(
         self,
@@ -495,13 +515,24 @@ class TicTacToeGUI:
             time.sleep(remaining)
         self.queue.put(("move", generation, move, why))
 
-    def _read_position(self) -> None:
-        snapshot = self.board.copy()
+    def _read_position(self, generation: int, snapshot: game.Board) -> None:
+        """Reads the solver values of one position and queues them.
+
+        Every empty board hashes to 0 and ``k`` is not hashed, so the read
+        is tagged with the game it belongs to, the board's shape and k, and
+        its hash; :meth:`_poll` drops it unless all three still match.
+
+        Args:
+            generation: The game's generation when the read was asked for.
+            snapshot: A private copy of the position to read.
+        """
         try:
             values = self.solver_engine.evaluate_moves(snapshot)
         except Exception:  # noqa: BLE001 - the overlay is best-effort
             return
-        self.queue.put(("solver", snapshot.hash, values))
+        self.queue.put(
+            ("solver", generation, snapshot.spec, snapshot.hash, values)
+        )
 
     def _poll(self) -> None:
         try:
@@ -517,12 +548,17 @@ class TicTacToeGUI:
                         and self.board.cells[move] == game.EMPTY
                     ):
                         self.board.push(move)
-                    self.detail.configure(text=why or "")
+                    self.why = why or ""
+                    self.why_ply = self.board.ply
                     self.draw()
                     self.after_move()
                 elif item[0] == "solver":
-                    _, board_hash, values = item
-                    if board_hash == self.board.hash:
+                    _, generation, spec, board_hash, values = item
+                    if (generation, spec, board_hash) == (
+                        self.generation,
+                        self.board.spec,
+                        self.board.hash,
+                    ):
                         self.solver_values = values
                         self.draw()
                 elif item[0] == "error":
@@ -677,7 +713,10 @@ class TicTacToeGUI:
                 % ("X" if self.human_side == game.X else "O"),
                 fg=INK,
             )
-        self.detail.configure(text=f"{b.rows}x{b.cols}, {b.k} in a row")
+        if self.why and b.ply == self.why_ply:
+            self.detail.configure(text=self.why)
+        else:
+            self.detail.configure(text=f"{b.rows}x{b.cols}, {b.k} in a row")
 
 
 def main(argv: list[str] | None = None) -> int:
