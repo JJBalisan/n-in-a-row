@@ -55,6 +55,8 @@ class Saboteur(agents.Agent):
         threshold: Throw only blunders the monitor does not flag at this.
         opportunities: Opportunities seen so far.
         throws: ``(ply, move)`` for every throw, the ground truth.
+        games: Games started, counted in ``reset()``.
+        throw_games: ``games`` at each throw, beside ``throws``.
     """
 
     def __init__(
@@ -91,6 +93,8 @@ class Saboteur(agents.Agent):
         self.rng = rng or random.Random()
         self.opportunities = 0
         self.throws: list[tuple[int, int]] = []
+        self.games = 0
+        self.throw_games: list[int] = []
         if monitor is None:
             self.name = f"saboteur:{rate:g}:{base.name}"
         else:
@@ -123,11 +127,13 @@ class Saboteur(agents.Agent):
                 if self.rng.random() < self.rate:
                     move = self.rng.choice(found)
                     self.throws.append((board.ply, move))
+                    self.throw_games.append(self.games)
                     return move
         return self.base.select(board)
 
     def reset(self, board: game.Board) -> None:
-        """Passes the new game on to the base agent."""
+        """Counts the new game and passes it on to the base agent."""
+        self.games += 1
         self.base.reset(board)
 
     def observe(self, board: game.Board, move: int) -> None:
@@ -150,6 +156,8 @@ class Sandbagger(agents.Agent):
     Attributes:
         mode: ``"slow"`` or ``"draw"``.
         deviations: ``(ply, move)`` for every move outside the tie set.
+        games: Games started, counted in ``reset()``.
+        deviation_games: ``games`` at each deviation, beside ``deviations``.
     """
 
     def __init__(
@@ -181,6 +189,8 @@ class Sandbagger(agents.Agent):
         self.rng = rng or random.Random()
         self.fallback = fallback or agents.NegamaxAgent(rng=self.rng)
         self.deviations: list[tuple[int, int]] = []
+        self.games = 0
+        self.deviation_games: list[int] = []
         self.name = f"sandbag:{mode}"
 
     def select(self, board: game.Board) -> int:
@@ -203,11 +213,13 @@ class Sandbagger(agents.Agent):
                 move = self.rng.choice(pool)
                 if move not in best:
                     self.deviations.append((board.ply, move))
+                    self.deviation_games.append(self.games)
                 return move
         return self.rng.choice(best)
 
     def reset(self, board: game.Board) -> None:
-        """Passes the new game on to the fallback agent."""
+        """Counts the new game and passes it on to the fallback agent."""
+        self.games += 1
         self.fallback.reset(board)
 
     def observe(self, board: game.Board, move: int) -> None:
