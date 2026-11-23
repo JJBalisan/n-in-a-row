@@ -8,7 +8,19 @@ _TESTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)
 
-from n_in_a_row import agents, env, game
+from n_in_a_row import agents, game
+
+
+def _require_numpy(test):
+    try:
+        import numpy as np  # noqa: F401
+    except ImportError:
+        if os.environ.get("CI"):
+            test.fail(
+                "numpy is not installed but CI is set; "
+                "install the test extra: pip install -e '.[test]'"
+            )
+        test.skipTest("numpy not installed (set CI=1 to make this a failure)")
 
 
 class Recorder(agents.Agent):
@@ -42,9 +54,15 @@ def _expected(board):
 
 
 class ObserveSelectTest(unittest.TestCase):
+    def setUp(self):
+        _require_numpy(self)
+        from n_in_a_row import env
+
+        self.env = env
+
     def test_illegal_move_under_lose_is_not_observed(self):
         opp = Recorder()
-        e = env.TicTacToeEnv(
+        e = self.env.TicTacToeEnv(
             3, opponent=opp, agent_plays=game.X, illegal_move="lose"
         )
         e.reset()
@@ -58,7 +76,7 @@ class ObserveSelectTest(unittest.TestCase):
 
     def test_illegal_move_under_raise_is_not_observed(self):
         opp = Recorder()
-        e = env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
+        e = self.env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
         e.reset()
         e.step(0)
         with self.assertRaises(game.InvalidMove):
@@ -68,7 +86,7 @@ class ObserveSelectTest(unittest.TestCase):
     def test_opponent_winning_move_is_observed(self):
         # Opponent O takes 6, 7, 8; the agent X plays 0, 1, 3 and loses.
         opp = Recorder(order=[6, 7, 8])
-        e = env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
+        e = self.env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
         e.reset()
         done = False
         for a in (0, 1, 3):
@@ -82,7 +100,7 @@ class ObserveSelectTest(unittest.TestCase):
     def test_drawn_game_every_move_observed(self):
         # X: 0 2 3 7 8 ; O: 1 4 5 6 -> draw.
         opp = Recorder(order=[4, 1, 5, 6])
-        e = env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
+        e = self.env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
         e.reset()
         done = False
         for a in (0, 2, 3, 7, 8):
@@ -94,7 +112,7 @@ class ObserveSelectTest(unittest.TestCase):
         self.assertEqual(opp.seen, _expected(e.board))
 
     def test_self_play_without_opponent_still_steps(self):
-        e = env.TicTacToeEnv(3)
+        e = self.env.TicTacToeEnv(3)
         e.reset()
         for a in (0, 3, 1, 4):
             _, _, done, _ = e.step(a)
@@ -105,14 +123,14 @@ class ObserveSelectTest(unittest.TestCase):
 
     def test_clone_tells_the_shared_opponent(self):
         opp = Recorder()
-        e = env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
+        e = self.env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
         e.reset()
         c = e.clone()
         c.step(0)
         self.assertEqual(opp.seen, [(1, 0), (2, 8)])
 
     def test_batch_opponents_observe_their_own_game(self):
-        batch = env.BatchEnv(3, 3, opponent_spec="random", seed=0)
+        batch = self.env.BatchEnv(3, 3, opponent_spec="random", seed=0)
         recs = [Recorder() for _ in batch.envs]
         for e, r in zip(batch.envs, recs):
             e.opponent = r
@@ -124,8 +142,16 @@ class ObserveSelectTest(unittest.TestCase):
 
 
 class AlternateSelectTest(unittest.TestCase):
+    def setUp(self):
+        _require_numpy(self)
+        from n_in_a_row import env
+
+        self.env = env
+
     def test_first_game_is_x_and_second_is_o(self):
-        batch = env.BatchEnv(3, 3, opponent_spec="fake_agent:LastLegal", seed=0)
+        batch = self.env.BatchEnv(
+            3, 3, opponent_spec="fake_agent:LastLegal", seed=0
+        )
         batch.reset()
         self.assertEqual([e.agent_plays for e in batch.envs], [game.X] * 3)
         dones = [False] * 3
@@ -135,7 +161,7 @@ class AlternateSelectTest(unittest.TestCase):
         self.assertEqual([e.agent_plays for e in batch.envs], [game.O] * 3)
 
     def test_one_env_finishing_does_not_flip_others(self):
-        batch = env.BatchEnv(
+        batch = self.env.BatchEnv(
             2,
             3,
             opponent_spec="fake_agent:LastLegal",
@@ -162,7 +188,7 @@ class AlternateSelectTest(unittest.TestCase):
         self.assertTrue(all(flips1), sides[1])
 
     def test_illegal_lose_counts_as_a_finished_game(self):
-        batch = env.BatchEnv(
+        batch = self.env.BatchEnv(
             1,
             3,
             opponent_spec="fake_agent:LastLegal",
@@ -178,7 +204,7 @@ class AlternateSelectTest(unittest.TestCase):
         self.assertEqual(batch.envs[0].agent_plays, game.O)
 
     def test_self_play_batch_runs_and_keeps_x(self):
-        batch = env.BatchEnv(2, 3, seed=0)
+        batch = self.env.BatchEnv(2, 3, seed=0)
         batch.reset()
         finished = 0
         for _ in range(30):

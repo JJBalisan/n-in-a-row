@@ -8,7 +8,19 @@ _TESTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)
 
-from n_in_a_row import agents, env, game
+from n_in_a_row import agents, game
+
+
+def _require_numpy(test):
+    try:
+        import numpy as np  # noqa: F401
+    except ImportError:
+        if os.environ.get("CI"):
+            test.fail(
+                "numpy is not installed but CI is set; "
+                "install the test extra: pip install -e '.[test]'"
+            )
+        test.skipTest("numpy not installed (set CI=1 to make this a failure)")
 
 
 class Recorder(agents.Agent):
@@ -37,9 +49,15 @@ def _expected(moves):
 
 
 class TicTacToeEnvObservesOpponentTest(unittest.TestCase):
+    def setUp(self):
+        _require_numpy(self)
+        from n_in_a_row import env
+
+        self.env = env
+
     def test_opponent_observes_every_move_by_both_sides(self):
         opp = Recorder()
-        e = env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
+        e = self.env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
         e.reset()
         done = False
         while not done:
@@ -51,7 +69,7 @@ class TicTacToeEnvObservesOpponentTest(unittest.TestCase):
 
     def test_opponent_holding_x_observes_its_opening_move(self):
         opp = Recorder()
-        e = env.TicTacToeEnv(3, opponent=opp, agent_plays=game.O)
+        e = self.env.TicTacToeEnv(3, opponent=opp, agent_plays=game.O)
         e.reset()
         self.assertEqual(e.board.moves_played(), [8])
         self.assertEqual(opp.seen, [(1, 8, 8)])
@@ -62,7 +80,7 @@ class TicTacToeEnvObservesOpponentTest(unittest.TestCase):
 
     def test_observe_counts_restart_with_each_game(self):
         opp = Recorder()
-        e = env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
+        e = self.env.TicTacToeEnv(3, opponent=opp, agent_plays=game.X)
         for swap in (False, True):
             e.reset(swap_sides=swap)
             done = False
