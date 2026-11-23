@@ -9,7 +9,24 @@ _TESTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)
 
-from n_in_a_row import env as rl_env
+try:
+    from n_in_a_row import env as rl_env
+except ModuleNotFoundError as err:
+    if err.name != "numpy":
+        raise
+    rl_env = None  # setUp skips every test, or fails it when CI is set
+
+
+def _require_numpy(test):
+    try:
+        import numpy as np  # noqa: F401
+    except ImportError:
+        if os.environ.get("CI"):
+            test.fail(
+                "numpy is not installed but CI is set; "
+                "install the test extra: pip install -e '.[test]'"
+            )
+        test.skipTest("numpy not installed (set CI=1 to make this a failure)")
 
 
 def _colour_sequences(batch, pick, games):
@@ -32,6 +49,9 @@ def _colour_sequences(batch, pick, games):
 
 
 class BatchEnvAlternatesPerEnvTest(unittest.TestCase):
+    def setUp(self):
+        _require_numpy(self)
+
     def _assert_flips_every_game(self, seqs):
         for i, seq in enumerate(seqs):
             flips = [a != b for a, b in zip(seq, seq[1:])]

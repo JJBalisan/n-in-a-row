@@ -8,7 +8,26 @@ _TESTS = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_TESTS))
 sys.path.insert(0, _TESTS)
 
-from n_in_a_row import agents, env, game
+from n_in_a_row import agents, game
+
+try:
+    from n_in_a_row import env
+except ModuleNotFoundError as err:
+    if err.name != "numpy":
+        raise
+    env = None  # setUp skips every test, or fails it when CI is set
+
+
+def _require_numpy(test):
+    try:
+        import numpy as np  # noqa: F401
+    except ImportError:
+        if os.environ.get("CI"):
+            test.fail(
+                "numpy is not installed but CI is set; "
+                "install the test extra: pip install -e '.[test]'"
+            )
+        test.skipTest("numpy not installed (set CI=1 to make this a failure)")
 
 
 class Recorder(agents.Agent):
@@ -42,6 +61,9 @@ def _expected(board):
 
 
 class ObserveSelectTest(unittest.TestCase):
+    def setUp(self):
+        _require_numpy(self)
+
     def test_illegal_move_under_lose_is_not_observed(self):
         opp = Recorder()
         e = env.TicTacToeEnv(
@@ -124,6 +146,9 @@ class ObserveSelectTest(unittest.TestCase):
 
 
 class AlternateSelectTest(unittest.TestCase):
+    def setUp(self):
+        _require_numpy(self)
+
     def test_first_game_is_x_and_second_is_o(self):
         batch = env.BatchEnv(3, 3, opponent_spec="fake_agent:LastLegal", seed=0)
         batch.reset()
