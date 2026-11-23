@@ -226,6 +226,28 @@ def play_match(
     return res
 
 
+def _built_in_spec(spec: str) -> bool:
+    """Tells whether ``spec`` names built-in agents only.
+
+    Only those are known to share the one Random they are given and to
+    keep nothing between games but a search table. A ``module:attribute``
+    agent may seed itself when built or keep state that only a new object
+    clears, so it is not reused. An unknown head counts as not built in.
+
+    Args:
+        spec: An agent spec, as :func:`n_in_a_row.agents.load_agent` reads
+            it.
+
+    Returns:
+        True when the spec, under any ``noisy:P:`` prefixes, is a built-in.
+    """
+    head, _, tail = spec.strip().partition(":")
+    while head.strip() == "noisy":
+        rest = tail.partition(":")[2].strip() or "perfect"
+        head, _, tail = rest.partition(":")
+    return head.strip() in agents.BUILTINS | {"negamax", "time"}
+
+
 def selfplay(
     agent_spec: str,
     games: int,
@@ -250,6 +272,16 @@ def selfplay(
         One record per game.
     """
     rng = random.Random(seed)
+    if not _built_in_spec(agent_spec):
+        for _ in range(games):
+            a = agents.load_agent(
+                agent_spec, random.Random(rng.getrandbits(32))
+            )
+            b = agents.load_agent(
+                agent_spec, random.Random(rng.getrandbits(32))
+            )
+            yield play_game(a, b, rows, cols, k)
+        return
     # Built once: a built-in agent shares the Random it is given with every
     # part of itself, so reseeding that one object reseeds the whole agent.
     rng_a, rng_b = random.Random(), random.Random()

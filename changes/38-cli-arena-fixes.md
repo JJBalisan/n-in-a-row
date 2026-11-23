@@ -19,5 +19,6 @@
   game, not twice (#44).
 - `GameRecord.from_json` reads back what `to_json` wrote (#49).
 - `bench` prints the k actually played, not `None` (#53).
-- `selfplay` builds its two agents once and reseeds them per game,
-  keeping records identical per seed (#57).
+- `selfplay` builds the two agents of a built-in spec once and reseeds
+  them per game, keeping records identical per seed; `module:attribute`
+  agents are still built per game (#57).
