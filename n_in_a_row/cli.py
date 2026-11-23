@@ -103,9 +103,7 @@ def cmd_play(args: argparse.Namespace) -> int:
             else:
                 print("\n(nothing to take back)\n")
             continue
-        except SystemExit as exc:
-            if not isinstance(seat, agents.HumanAgent):
-                raise  # An agent's own exit code is kept.
+        except agents.HumanQuit as exc:  # Any other exit is kept as is.
             print(exc)
             return 0
         if mover != human_side:
@@ -478,7 +476,7 @@ def main(argv: list[str] | None = None) -> int:
     except agents.Undo:
         print("error: undo only works in play", file=sys.stderr)
         return 2
-    except arena.HumanQuit as exc:
+    except agents.HumanQuit as exc:
         # A human seat quitting or running out of input, outside play.
         print(exc.code, file=sys.stderr)
         return 0

@@ -1,3 +1,15 @@
+### Added
+
+- `agents.HumanQuit`, also importable as `arena.HumanQuit`: the
+  `SystemExit` subclass a `HumanAgent` raises when its player quits or
+  input ends. Only it is turned into exit 0; any other agent's
+  `SystemExit` exits as before (#38).
+
+### Changed
+
+- A human quit raises `agents.HumanQuit`, a `SystemExit` subclass, in
+  place of a plain `SystemExit` (#38).
+
 ### Fixed
 
 - `play --opponent human` and `match` with a human seat no longer let
