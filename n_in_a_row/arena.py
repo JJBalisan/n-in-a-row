@@ -7,7 +7,7 @@ import json
 import random
 from collections.abc import Callable, Iterator
 
-from n_in_a_row import agents, game
+from n_in_a_row import agents, game, search
 
 
 @dataclasses.dataclass
@@ -248,6 +248,32 @@ def _built_in_spec(spec: str) -> bool:
     return head.strip() in agents.BUILTINS | {"negamax", "time"}
 
 
+def _start_cold(agent: agents.Agent, cells: int) -> None:
+    """Gives a built-in agent a fresh engine unless its search is exhaustive.
+
+    A search that reaches the end of the game from the empty board returns
+    the same moves whatever its table holds, so it keeps the table. One
+    with a time limit, or a depth cap below ``cells``, reads deeper entries
+    left by earlier games and plays other moves, so it starts each game as
+    a newly built agent would.
+
+    Args:
+        agent: An agent built from a built-in spec.
+        cells: Cells on the board, the most plies a game can last.
+    """
+    while isinstance(agent, agents.NoisyAgent):
+        agent = agent.base
+    if not isinstance(agent, agents.NegamaxAgent):
+        return
+    old = agent.engine
+    depth = old.max_depth
+    if depth is None:
+        depth = search.SOFT_EXACT_LIMIT
+    if old.time_limit is None and depth >= cells:
+        return
+    agent.engine = search.Negamax(old.max_depth, old.time_limit, old.tt_size)
+
+
 def selfplay(
     agent_spec: str,
     games: int,
@@ -287,9 +313,12 @@ def selfplay(
     rng_a, rng_b = random.Random(), random.Random()
     a = agents.load_agent(agent_spec, rng_a)
     b = agents.load_agent(agent_spec, rng_b)
+    cells = rows * (cols or rows)
     for _ in range(games):
         rng_a.seed(rng.getrandbits(32))
         rng_b.seed(rng.getrandbits(32))
+        _start_cold(a, cells)
+        _start_cold(b, cells)
         yield play_game(a, b, rows, cols, k)
 
 

@@ -12,13 +12,19 @@
 
 ### Fixed
 
-- `play --opponent human` and `match` with a human seat no longer let
-  an undo or quit escape `main` as a traceback; the opponent's undo
-  takes back like the player's (#38).
+- `play --opponent human`: the opponent's undo takes back like the
+  player's, where it was a traceback, and its quit or end of input
+  ends the game with exit 0, where it was exit 1. In `match` and
+  `selfplay` a human seat's undo exits 2 with a message, where it was
+  a traceback, and its quit or end of input exits 0, where it was
+  exit 1 (#38).
 - One agent object in both seats gets `reset` and `observe` once per
   game, not twice (#44).
 - `GameRecord.from_json` reads back what `to_json` wrote (#49).
 - `bench` prints the k actually played, not `None` (#53).
 - `selfplay` builds the two agents of a built-in spec once and reseeds
-  them per game, keeping records identical per seed; `module:attribute`
-  agents are still built per game (#57).
+  them per game, and a search that runs to the end of the game keeps
+  its table from game to game. A time-limited or depth-capped search
+  starts each game with an empty table, and `module:attribute` agents
+  are still built per game, so the records for a seed are as before
+  (#57).
