@@ -7,7 +7,7 @@ import json
 import random
 from collections.abc import Callable, Iterator
 
-from n_in_a_row import agents, game
+from n_in_a_row import agents, game, search
 
 
 @dataclasses.dataclass
@@ -46,6 +46,32 @@ class GameRecord:
             }
         )
 
+    @classmethod
+    def from_json(cls, line: str) -> GameRecord:
+        """Reads a record back from a line written by :meth:`to_json`.
+
+        Args:
+            line: One line of JSON.
+
+        Returns:
+            The record, equal to the one that was written.
+
+        Raises:
+            ValueError: If the line is not JSON.
+            KeyError: If a field is missing.
+        """
+        data = json.loads(line)
+        return cls(
+            data["rows"],
+            data["cols"],
+            data["k"],
+            list(data["moves"]),
+            data["winner"],
+        )
+
+
+HumanQuit = agents.HumanQuit  # Kept here too; HumanAgent raises it.
+
 
 def play_game(
     x_agent: agents.Agent,
@@ -68,16 +94,21 @@ def play_game(
 
     Returns:
         The move list and the result.
+
+    Raises:
+        HumanQuit: When a human seat quits or its input ends.
     """
     board = game.Board(rows, cols, k)
     players = {game.X: x_agent, game.O: o_agent}
-    for a in players.values():
+    # One object in both seats gets each hook once; equal objects do not merge.
+    distinct = list({id(a): a for a in players.values()}.values())
+    for a in distinct:
         a.reset(board)
     while not board.is_terminal:
         mover = board.to_move
         move = players[mover].select(board)
         board.push(move)
-        for a in players.values():
+        for a in distinct:
             a.observe(board, move)
         if on_move is not None:
             on_move(board, mover, move)
@@ -195,6 +226,54 @@ def play_match(
     return res
 
 
+def _built_in_spec(spec: str) -> bool:
+    """Tells whether ``spec`` names built-in agents only.
+
+    Only those are known to share the one Random they are given and to
+    keep nothing between games but a search table. A ``module:attribute``
+    agent may seed itself when built or keep state that only a new object
+    clears, so it is not reused. An unknown head counts as not built in.
+
+    Args:
+        spec: An agent spec, as :func:`n_in_a_row.agents.load_agent` reads
+            it.
+
+    Returns:
+        True when the spec, under any ``noisy:P:`` prefixes, is a built-in.
+    """
+    head, _, tail = spec.strip().partition(":")
+    while head.strip() == "noisy":
+        rest = tail.partition(":")[2].strip() or "perfect"
+        head, _, tail = rest.partition(":")
+    return head.strip() in agents.BUILTINS | {"negamax", "time"}
+
+
+def _start_cold(agent: agents.Agent, cells: int) -> None:
+    """Gives a built-in agent a fresh engine unless its search is exhaustive.
+
+    A search that reaches the end of the game from the empty board returns
+    the same moves whatever its table holds, so it keeps the table. One
+    with a time limit, or a depth cap below ``cells``, reads deeper entries
+    left by earlier games and plays other moves, so it starts each game as
+    a newly built agent would.
+
+    Args:
+        agent: An agent built from a built-in spec.
+        cells: Cells on the board, the most plies a game can last.
+    """
+    while isinstance(agent, agents.NoisyAgent):
+        agent = agent.base
+    if not isinstance(agent, agents.NegamaxAgent):
+        return
+    old = agent.engine
+    depth = old.max_depth
+    if depth is None:
+        depth = search.SOFT_EXACT_LIMIT
+    if old.time_limit is None and depth >= cells:
+        return
+    agent.engine = search.Negamax(old.max_depth, old.time_limit, old.tt_size)
+
+
 def selfplay(
     agent_spec: str,
     games: int,
@@ -219,9 +298,27 @@ def selfplay(
         One record per game.
     """
     rng = random.Random(seed)
+    if not _built_in_spec(agent_spec):
+        for _ in range(games):
+            a = agents.load_agent(
+                agent_spec, random.Random(rng.getrandbits(32))
+            )
+            b = agents.load_agent(
+                agent_spec, random.Random(rng.getrandbits(32))
+            )
+            yield play_game(a, b, rows, cols, k)
+        return
+    # Built once: a built-in agent shares the Random it is given with every
+    # part of itself, so reseeding that one object reseeds the whole agent.
+    rng_a, rng_b = random.Random(), random.Random()
+    a = agents.load_agent(agent_spec, rng_a)
+    b = agents.load_agent(agent_spec, rng_b)
+    cells = rows * (cols or rows)
     for _ in range(games):
-        a = agents.load_agent(agent_spec, random.Random(rng.getrandbits(32)))
-        b = agents.load_agent(agent_spec, random.Random(rng.getrandbits(32)))
+        rng_a.seed(rng.getrandbits(32))
+        rng_b.seed(rng.getrandbits(32))
+        _start_cold(a, cells)
+        _start_cold(b, cells)
         yield play_game(a, b, rows, cols, k)
 
 

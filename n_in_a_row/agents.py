@@ -206,6 +206,14 @@ class FunctionAgent(Agent):
         return int(self.fn(board))
 
 
+class HumanQuit(SystemExit):
+    """Raised by :class:`HumanAgent` itself when its player quits.
+
+    Only this marks a human seat's quit (the quit command, or input that
+    ends or is interrupted); any other SystemExit is someone else's.
+    """
+
+
 class HumanAgent(Agent):
     """Reads a move from a prompt: 'b2', '2,3', a bare index, or a command.
 
@@ -242,7 +250,7 @@ class HumanAgent(Agent):
 
         Raises:
             Undo: When the user asks to take back a move.
-            SystemExit: When the user quits, or input ends or is
+            HumanQuit: When the user quits, or input ends or is
                 interrupted.
         """
         while True:
@@ -251,10 +259,10 @@ class HumanAgent(Agent):
                     f"{self.prompt} ({board.label(board.legal_moves()[0])}) > "
                 )
             except (EOFError, KeyboardInterrupt):
-                raise SystemExit("\nstopped") from None
+                raise HumanQuit("\nstopped") from None
             cmd = raw.strip().lower()
             if cmd in ("q", "quit", "exit", "resign"):
-                raise SystemExit("resigned")
+                raise HumanQuit("resigned")
             if cmd in ("u", "undo"):
                 raise Undo()
             if cmd in ("?", "h", "help"):
