@@ -17,7 +17,8 @@
   ends the game with exit 0, where it was exit 1. In `match` and
   `selfplay` a human seat's undo exits 2 with a message, where it was
   a traceback, and its quit or end of input exits 0, where it was
-  exit 1 (#38).
+  exit 1. An `Undo` from any seat that is not itself a `HumanAgent`
+  exits 2 with the same message, in `play` too (#38).
 - One agent object in both seats gets `reset` and `observe` once per
   game, not twice (#44).
 - `GameRecord.from_json` reads back what `to_json` wrote (#49).
