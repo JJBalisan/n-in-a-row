@@ -12,6 +12,49 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-23
+
+### Added
+
+- `agents.HumanQuit`, also importable as `arena.HumanQuit`: the
+  `SystemExit` subclass a `HumanAgent` raises when its player quits or
+  input ends. Only it is turned into exit 0; any other agent's
+  `SystemExit` exits as before (#38).
+
+### Changed
+
+- A human quit raises `agents.HumanQuit`, a `SystemExit` subclass, in
+  place of a plain `SystemExit` (#38).
+
+### Fixed
+
+- `play --opponent human`: the opponent's undo takes back like the
+  player's, where it was a traceback, and its quit or end of input
+  ends the game with exit 0, where it was exit 1. In `match` and
+  `selfplay` a human seat's undo exits 2 with a message, where it was
+  a traceback, and its quit or end of input exits 0, where it was
+  exit 1. An `Undo` from any seat that is not itself a `HumanAgent`
+  exits 2 with the same message, in `play` too (#38).
+- One agent object in both seats gets `reset` and `observe` once per
+  game, not twice (#44).
+- `GameRecord.from_json` reads back what `to_json` wrote (#49).
+- `bench` prints the k actually played, not `None` (#53).
+- `selfplay` builds the two agents of a built-in spec once and reseeds
+  them per game, and a search that runs to the end of the game keeps
+  its table from game to game. A time-limited or depth-capped search
+  starts each game with an empty table, and `module:attribute` agents
+  are still built per game, so the records for a seed are as before
+  (#57).
+- `Saboteur.throw_games` and `Sandbagger.deviation_games` record the game
+  of each `throws` / `deviations` entry, so entries from different games
+  can be told apart. The game is the agent's new `games` attribute, which
+  each `reset()` raises by one from 0: entries logged before the first
+  `reset()` get 0, and with one `reset()` per game the first game is 1
+  (#52).
+- The env tests `test_n_env_alternate`, `test_n_env_opponent_observe` and
+  `test_n_env_select` skip without NumPy (and fail when `CI` is set)
+  instead of erroring at import (#83).
+
 ## [1.2.0] - 2026-11-22
 
 ### Changed
@@ -172,7 +215,8 @@ a MAJOR change breaks the public API (`game`, `search`, `agents`, `arena`,
   board's shape or run length changes, and stores mate scores relative to
   the stored position, so a reused entry no longer misjudges a mate.
 
-[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/JJBalisan/n-in-a-row/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/JJBalisan/n-in-a-row/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.4...v1.2.0
 [1.1.4]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/JJBalisan/n-in-a-row/compare/v1.1.2...v1.1.3
